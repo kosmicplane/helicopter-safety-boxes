@@ -1,0 +1,10 @@
+{
+  "active_target": 4,
+  "occupancy_version": 30,
+  "position_xy_m": [
+    2.127835481853975,
+    0.6976347243598916
+  ],
+  "tau_active": -8.418804473000147,
+  "tau_contingency": -10.0
+}

@@ -1,0 +1,1186 @@
+"""Asynchronous phone/video-to-Poisson pipeline with a latest-frame-only worker."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from pathlib import Path
+from queue import Empty, Full, Queue
+from threading import Lock, Thread
+from time import perf_counter, sleep
+from typing import Any, Generic, TypeVar
+
+import cv2
+import numpy as np
+
+from cbf_safety_box import CBFBox, CBFBoxConfig, SafetySample, SystemState
+
+from .calibration import (
+    CalibrationData,
+    GlobalMotionDetector,
+    MotionEstimate,
+    assume_top_down_calibration,
+    interactive_calibration,
+    rectify_image,
+)
+from .coordinates import GridFieldSampler, GridGeometry
+from .io_utils import resolve_path, save_json, save_yaml
+from .metrics import MetricsRecorder, RateMeter
+from .occupancy import (
+    OccupancyMaps,
+    TemporalOccupancyFilter,
+    changed_fraction,
+    grid_spacing_from_workspace,
+    inflate_occupancy_physical,
+    mask_to_occupancy,
+)
+from .poisson_runner import PoissonRunRecord, run_poisson
+from .poisson_visualization import render_live_dashboard, save_live_poisson_surface
+from .segmentation import (
+    SUPPORTED_SEGMENTATION_MODES,
+    load_background_reference,
+    segment_image,
+)
+
+
+T = TypeVar("T")
+
+
+class LatestItemQueue(Generic[T]):
+    """A thread-safe queue that stores at most the newest unprocessed item."""
+
+    def __init__(self) -> None:
+        self._queue: Queue[T] = Queue(maxsize=1)
+        self.discarded_items = 0
+        self.maximum_observed_size = 0
+        self._lock = Lock()
+
+    def put_latest(self, item: T) -> None:
+        """Insert an item, replacing any older queued item without blocking."""
+
+        with self._lock:
+            try:
+                self._queue.put_nowait(item)
+            except Full:
+                try:
+                    self._queue.get_nowait()
+                    self._queue.task_done()
+                    self.discarded_items += 1
+                except Empty:
+                    pass
+                self._queue.put_nowait(item)
+            self.maximum_observed_size = max(self.maximum_observed_size, self._queue.qsize())
+
+    def get(self, timeout: float | None = None) -> T:
+        """Remove and return the queued item."""
+
+        return self._queue.get(timeout=timeout)
+
+    def task_done(self) -> None:
+        """Mark the current item as processed."""
+
+        self._queue.task_done()
+
+    def empty(self) -> bool:
+        """Return whether no item is waiting."""
+
+        return self._queue.empty()
+
+    def qsize(self) -> int:
+        """Return the current queue size, which is always zero or one."""
+
+        return self._queue.qsize()
+
+
+@dataclass(frozen=True)
+class OccupancyTask:
+    """Immutable input to one asynchronous Poisson solve."""
+
+    version_id: int
+    submitted_time_s: float
+    occupancy: np.ndarray
+    forcing_method: str
+    solver: str
+    compute_laplacian_check: bool
+
+
+@dataclass(frozen=True)
+class PoissonSnapshot:
+    """Most recent accepted Poisson result and its timing metadata."""
+
+    version_id: int
+    submitted_time_s: float
+    completed_time_s: float
+    record: PoissonRunRecord
+
+    @property
+    def age_s(self) -> float:
+        """Return age since the occupancy snapshot was submitted for solving."""
+
+        return max(0.0, perf_counter() - self.submitted_time_s)
+
+
+class PoissonWorker:
+    """Single background worker that solves only the latest occupancy task."""
+
+    def __init__(
+        self,
+        *,
+        grid_spacing_yx: tuple[float, float],
+        poisson_config: dict[str, Any],
+        metrics: MetricsRecorder,
+    ) -> None:
+        self.grid_spacing_yx = grid_spacing_yx
+        self.poisson_config = dict(poisson_config)
+        self.metrics = metrics
+        self.queue: LatestItemQueue[OccupancyTask] = LatestItemQueue()
+        self._stop_requested = False
+        self._latest_submitted_version = -1
+        self._latest_snapshot: PoissonSnapshot | None = None
+        self._discarded_obsolete_solves = 0
+        self._failed_solves = 0
+        self._invalid_solves = 0
+        self._lock = Lock()
+        self._thread = Thread(target=self._run, name="poisson-worker", daemon=True)
+        self._thread.start()
+
+    @property
+    def discarded_obsolete_solves(self) -> int:
+        """Return the number of completed results rejected as obsolete."""
+
+        with self._lock:
+            return self._discarded_obsolete_solves
+
+    @property
+    def failed_solves(self) -> int:
+        """Return the number of Poisson tasks that raised an exception."""
+
+        with self._lock:
+            return self._failed_solves
+
+    @property
+    def invalid_solves(self) -> int:
+        """Return the number of completed fields rejected by validation."""
+
+        with self._lock:
+            return self._invalid_solves
+
+    def submit(self, task: OccupancyTask) -> None:
+        """Submit one task and update the newest version visible to the worker."""
+
+        with self._lock:
+            self._latest_submitted_version = max(self._latest_submitted_version, task.version_id)
+        self.queue.put_latest(task)
+
+    def latest_snapshot(self) -> PoissonSnapshot | None:
+        """Return the newest accepted snapshot without transferring ownership."""
+
+        with self._lock:
+            return self._latest_snapshot
+
+    def _run(self) -> None:
+        """Worker loop with exception isolation and obsolete-result rejection."""
+
+        while not self._stop_requested or not self.queue.empty():
+            try:
+                task = self.queue.get(timeout=0.1)
+            except Empty:
+                continue
+            try:
+                local_config = dict(self.poisson_config)
+                local_config["compute_laplacian_check"] = task.compute_laplacian_check
+                record = run_poisson(
+                    task.occupancy,
+                    grid_spacing_yx=self.grid_spacing_yx,
+                    poisson_config=local_config,
+                    forcing_method=task.forcing_method,
+                    solver=task.solver,
+                    live_mode=True,
+                )
+                completed = perf_counter()
+                validation = record.validation.get("result", {})
+                numerically_valid = bool(record.validation.valid)
+                with self._lock:
+                    obsolete = task.version_id < self._latest_submitted_version
+                    if obsolete:
+                        self._discarded_obsolete_solves += 1
+                    elif not numerically_valid:
+                        self._invalid_solves += 1
+                    else:
+                        self._latest_snapshot = PoissonSnapshot(
+                            version_id=task.version_id,
+                            submitted_time_s=task.submitted_time_s,
+                            completed_time_s=completed,
+                            record=record,
+                        )
+                if not numerically_valid:
+                    self.metrics.add_warning(
+                        "poisson_validation_rejected",
+                        version_id=task.version_id,
+                        forcing_method=task.forcing_method,
+                        solver=task.solver,
+                        residual_max_abs=validation.get("residual_max_abs"),
+                        solver_status=validation.get("solver_status"),
+                    )
+                accepted = numerically_valid and not obsolete
+                self.metrics.add_solve(
+                    {
+                        "version_id": task.version_id,
+                        "submitted_time_s": task.submitted_time_s,
+                        "completed_time_s": completed,
+                        "solve_wall_time_s": record.wall_time_s,
+                        "pipeline_from_submit_s": completed - task.submitted_time_s,
+                        "forcing_method": task.forcing_method,
+                        "solver": task.solver,
+                        "solve_cells": validation.get("solve_cells"),
+                        "boundary_cells": validation.get("boundary_cells"),
+                        "poisson_residual_max_abs": validation.get("residual_max_abs"),
+                        "accepted": accepted,
+                        "numerically_valid": numerically_valid,
+                        "obsolete": obsolete,
+                        "status": validation.get("solver_status"),
+                    }
+                )
+            except Exception as error:  # The live UI must survive one invalid mask or failed solve.
+                with self._lock:
+                    self._failed_solves += 1
+                self.metrics.add_warning(
+                    "poisson_worker_failure",
+                    version_id=task.version_id,
+                    error_type=type(error).__name__,
+                    error_message=str(error),
+                )
+            finally:
+                self.queue.task_done()
+
+    def close(self, *, timeout_s: float = 15.0) -> None:
+        """Request shutdown and wait for the current/latest task to finish."""
+
+        self._stop_requested = True
+        self._thread.join(timeout=max(0.1, float(timeout_s)))
+        if self._thread.is_alive():
+            self.metrics.add_warning("poisson_worker_join_timeout", timeout_s=timeout_s)
+
+
+class VideoSource:
+    """OpenCV source wrapper with bounded reconnection attempts and clean release."""
+
+    def __init__(self, source: str | int, *, reconnection_attempts: int = 3, reconnection_delay_s: float = 0.25) -> None:
+        self.source = source
+        self.reconnection_attempts = max(0, int(reconnection_attempts))
+        self.reconnection_delay_s = max(0.0, float(reconnection_delay_s))
+        self.capture: cv2.VideoCapture | None = None
+        self.reconnections = 0
+        self.open()
+
+    def open(self) -> None:
+        """Open or reopen the configured source."""
+
+        if self.capture is not None:
+            self.capture.release()
+        self.capture = cv2.VideoCapture(self.source)
+        # Minimize buffered frames for MJPEG/RTSP sources.
+        # Some OpenCV backends may ignore this property.
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        if not self.capture.isOpened():
+            self.capture.release()
+            self.capture = None
+            raise RuntimeError(f"OpenCV could not open video source: {self.source!r}")
+
+    def read(self) -> tuple[bool, np.ndarray | None, float]:
+        """Read one frame, attempting a bounded reconnect after empty reads."""
+
+        if self.capture is None:
+            return False, None, perf_counter()
+        ok, frame = self.capture.read()
+        timestamp = perf_counter()
+        if ok and frame is not None and frame.size:
+            return True, frame, timestamp
+        for _attempt in range(self.reconnection_attempts):
+            sleep(self.reconnection_delay_s)
+            try:
+                self.open()
+            except RuntimeError:
+                continue
+            assert self.capture is not None
+            ok, frame = self.capture.read()
+            timestamp = perf_counter()
+            self.reconnections += 1
+            if ok and frame is not None and frame.size:
+                return True, frame, timestamp
+        return False, None, timestamp
+
+    @property
+    def nominal_fps(self) -> float:
+        """Return source-reported FPS when available."""
+
+        if self.capture is None:
+            return 0.0
+        value = float(self.capture.get(cv2.CAP_PROP_FPS))
+        return value if np.isfinite(value) and value > 0.0 else 0.0
+
+    def release(self) -> None:
+        """Release the OpenCV capture exactly once."""
+
+        if self.capture is not None:
+            self.capture.release()
+            self.capture = None
+
+
+def parse_video_source(source_text: str) -> str | int:
+    """Interpret a plain integer string as a webcam index; preserve other strings."""
+
+    stripped = str(source_text).strip()
+    if stripped.lstrip("-").isdigit():
+        return int(stripped)
+    return stripped
+
+
+@dataclass
+class LiveRunState:
+    """Mutable UI and stream state kept separate from numerical modules."""
+
+    paused: bool = False
+    diagnostics_enabled: bool = True
+    cbf_demo_enabled: bool = False
+    recalibration_requested: bool = False
+    snapshot_requested: bool = False
+    forcing_index: int = 0
+    segmentation_index: int = 0
+
+
+@dataclass
+class VirtualCBFState:
+    """State of the optional, non-hardware virtual CBF marker."""
+
+    position_xy: np.ndarray
+    goal_xy: np.ndarray
+    last_update_time_s: float
+
+
+@dataclass(frozen=True)
+class LiveExperimentReport:
+    """Files and measured counters returned by one completed live run."""
+
+    output_directory: Path
+    frames_processed: int
+    metrics_path: Path
+    summary_path: Path
+    runtime_state_path: Path
+    queue_maximum_observed_size: int
+    discarded_queued_tasks: int
+    discarded_obsolete_solves: int
+    reconnections: int
+
+
+class LivePoissonPipeline:
+    """Coordinate capture, perception, latest-only Poisson synthesis, and UI."""
+
+    def __init__(
+        self,
+        *,
+        source: str | int,
+        config: dict[str, Any],
+        output_directory: str | Path,
+        config_directory: str | Path | None = None,
+        headless: bool = False,
+        maximum_frames: int | None = None,
+        max_frames: int | None = None,
+    ) -> None:
+        """Initialize the live pipeline without opening the video source.
+
+        ``max_frames`` is a concise alias retained for tests and notebooks.
+        Configuration-relative files use ``config_directory`` when supplied and
+        otherwise resolve from the current working directory.
+        """
+
+        if maximum_frames is not None and max_frames is not None:
+            raise ValueError("Pass maximum_frames or max_frames, not both.")
+        self.source_value = source
+        self.config = config
+        self.config_directory = Path(config_directory or Path.cwd()).expanduser().resolve()
+        self.output_directory = Path(output_directory).expanduser().resolve()
+        self.output_directory.mkdir(parents=True, exist_ok=True)
+        self.headless = bool(headless)
+        self.maximum_frames = maximum_frames if maximum_frames is not None else max_frames
+        self.metrics = MetricsRecorder()
+        self.capture_rate = RateMeter()
+        self.display_rate = RateMeter()
+        self.poisson_rate = RateMeter(window_seconds=4.0)
+        self.state = LiveRunState()
+        self._last_seen_snapshot_version = -1
+        self._previous_h: np.ndarray | None = None
+        self._previous_h_time_s: float | None = None
+        self._partial_h_t: np.ndarray | None = None
+        self._last_submitted_occupancy: np.ndarray | None = None
+        self._last_submit_time_s = -np.inf
+        self._version_counter = 0
+        self._snapshot_counter = 0
+        self._video_writer: cv2.VideoWriter | None = None
+        self._last_dashboard: np.ndarray | None = None
+        self._virtual_cbf: VirtualCBFState | None = None
+        self._extract_configuration()
+
+    def _extract_configuration(self) -> None:
+        """Validate and cache frequently used YAML values."""
+
+        workspace = dict(self.config.get("workspace", {}))
+        self.workspace_size_m = (float(workspace["width_m"]), float(workspace["height_m"]))
+        grid = dict(workspace.get("grid", {}))
+        grid.setdefault("nx", workspace.get("grid_nx", 96))
+        grid.setdefault("ny", workspace.get("grid_ny", 72))
+        self.grid_shape_yx = (int(grid["ny"]), int(grid["nx"]))
+        rectified = dict(workspace.get("rectified_image", {}))
+        rectified.setdefault("width_px", workspace.get("rectified_width_px", 640))
+        rectified.setdefault("height_px", workspace.get("rectified_height_px", 480))
+        self.rectified_size_px = (int(rectified["width_px"]), int(rectified["height_px"]))
+        self.grid_spacing_yx = grid_spacing_from_workspace(self.workspace_size_m, self.grid_shape_yx)
+
+        self.calibration_config = dict(self.config.get("calibration", {}))
+        self.segmentation_config = dict(self.config.get("segmentation", {}))
+        # Normalize compact configuration keys used by programmatic experiments.
+        if "hsv_lower" in self.segmentation_config or "hsv_upper" in self.segmentation_config:
+            hsv = dict(self.segmentation_config.get("hsv", {}))
+            hsv["lower"] = self.segmentation_config.get("hsv_lower", hsv.get("lower", [0, 0, 0]))
+            hsv["upper"] = self.segmentation_config.get("hsv_upper", hsv.get("upper", [179, 255, 255]))
+            self.segmentation_config["hsv"] = hsv
+        cleanup = dict(self.segmentation_config.get("cleanup", {}))
+        for key in ("blur_kernel", "open_kernel", "close_kernel", "fill_holes", "invert"):
+            if key in self.segmentation_config:
+                cleanup[key] = self.segmentation_config[key]
+        if "min_component_area_px" in self.segmentation_config:
+            cleanup["minimum_component_area_px"] = self.segmentation_config["min_component_area_px"]
+        self.segmentation_config["cleanup"] = cleanup
+        background = dict(self.segmentation_config.get("background", {}))
+        if "background_threshold" in self.segmentation_config:
+            background["difference_threshold"] = self.segmentation_config["background_threshold"]
+        if "background_blur_kernel" in self.segmentation_config:
+            background["difference_blur_kernel"] = self.segmentation_config["background_blur_kernel"]
+        self.segmentation_config["background"] = background
+
+        # Accept both historical ``geometry`` and canonical ``occupancy``
+        # sections.  Canonical keys override legacy keys without discarding
+        # unspecified footprint or margin values.
+        self.geometry_config = {
+            **dict(self.config.get("geometry", {})),
+            **dict(self.config.get("occupancy", {})),
+        }
+        self.poisson_config = dict(self.config.get("poisson", {}))
+        self.live_config = dict(self.config.get("live", {}))
+        if "temporal_filter" in self.config and "temporal_filter" not in self.live_config:
+            temporal = dict(self.config.get("temporal_filter", {}))
+            if "method" in temporal and "mode" not in temporal:
+                temporal["mode"] = temporal["method"]
+            self.live_config["temporal_filter"] = temporal
+        if "stream" in self.config and "source" not in self.live_config:
+            stream = dict(self.config.get("stream", {}))
+            self.live_config["source"] = {
+                "reconnection_attempts": stream.get("reconnect_attempts", 2),
+                "reconnection_delay_s": stream.get("reconnect_delay_s", 0.2),
+            }
+        self.motion_config = dict(self.config.get("camera_motion", {}))
+        self.output_config = dict(self.config.get("output", {}))
+        recording = dict(self.config.get("recording", {}))
+        dashboard = dict(self.config.get("dashboard", {}))
+        if "record_dashboard_video" in recording:
+            self.output_config["record_dashboard_video"] = recording["record_dashboard_video"]
+        if "panel_size" in dashboard:
+            self.output_config["dashboard_panel_size"] = dashboard["panel_size"]
+        self.cbf_demo_config = dict(self.config.get("cbf_demo", {}))
+
+        self.forcing_methods = list(
+            self.live_config.get(
+                "forcing_methods",
+                self.poisson_config.get(
+                    "live_forcing_methods",
+                    [self.poisson_config.get("forcing_method", "constant")],
+                ),
+            )
+        )
+        if not self.forcing_methods:
+            raise ValueError("At least one live forcing method is required.")
+        configured_forcing = str(self.poisson_config.get("forcing_method", self.forcing_methods[0]))
+        self.state.forcing_index = self.forcing_methods.index(configured_forcing) if configured_forcing in self.forcing_methods else 0
+        self.poisson_solver = str(self.poisson_config.get("solver", "conjugate_gradient"))
+
+        self.segmentation_modes = list(
+            self.live_config.get(
+                "segmentation_modes",
+                self.segmentation_config.get(
+                    "live_modes",
+                    [self.segmentation_config.get("mode", "background_reference")],
+                ),
+            )
+        )
+        for mode in self.segmentation_modes:
+            if mode not in SUPPORTED_SEGMENTATION_MODES:
+                raise ValueError(f"Unsupported live segmentation mode: {mode!r}")
+        configured_segmentation = str(self.segmentation_config.get("mode", self.segmentation_modes[0]))
+        self.state.segmentation_index = self.segmentation_modes.index(configured_segmentation) if configured_segmentation in self.segmentation_modes else 0
+
+        temporal_cfg = self.live_config.get("temporal_filter", {})
+        self.temporal_filter = TemporalOccupancyFilter(
+            str(temporal_cfg.get("mode", "majority")),
+            window_size=int(temporal_cfg.get("window_size", 5)),
+            ema_alpha=float(temporal_cfg.get("ema_alpha", 0.35)),
+            ema_threshold=float(temporal_cfg.get("ema_threshold", 0.5)),
+            activation_frames=int(temporal_cfg.get("activation_frames", 2)),
+            deactivation_frames=int(temporal_cfg.get("deactivation_frames", 4)),
+        )
+        self.minimum_changed_fraction = float(self.live_config.get("minimum_changed_fraction", self.poisson_config.get("changed_fraction_threshold", 0.002)))
+        self.maximum_submit_interval_s = float(self.live_config.get("maximum_submit_interval_s", 0.5))
+        self.laplacian_every_n_solves = max(0, int(self.live_config.get("laplacian_every_n_solves", self.poisson_config.get("laplacian_check_every_n_solves", 10))))
+        self.maximum_field_age_s = float(self.live_config.get("maximum_field_age_s", float(self.config.get("dashboard", {}).get("stale_field_threshold_ms", 750.0)) / 1000.0))
+        self.snapshot_every_n_solves = max(0, int(self.output_config.get("snapshot_every_n_solves", 0)))
+        self.state.cbf_demo_enabled = bool(self.cbf_demo_config.get("enabled", False))
+
+    def _initial_calibration(self, frame: np.ndarray) -> CalibrationData:
+        """Build or load the calibration used by every subsequent frame."""
+
+        mode = str(self.calibration_config.get("mode", "assume_top_down"))
+        if mode in {"assume_top_down", "identity"}:
+            output_size = self.rectified_size_px if mode == "assume_top_down" else (frame.shape[1], frame.shape[0])
+            return assume_top_down_calibration(
+                frame.shape,
+                output_size_px=output_size,
+                workspace_size_m=self.workspace_size_m,
+            )
+        if mode == "load_file":
+            path = resolve_path(self.calibration_config.get("file"), base_directory=self.config_directory)
+            if path is None:
+                raise ValueError("calibration.mode=load_file requires calibration.file.")
+            return CalibrationData.load(path)
+        if mode == "interactive":
+            if self.headless:
+                raise RuntimeError("Interactive calibration is unavailable in headless mode.")
+            return interactive_calibration(
+                frame,
+                output_size_px=self.rectified_size_px,
+                workspace_size_m=self.workspace_size_m,
+            )
+        raise ValueError(f"Unsupported calibration mode: {mode!r}")
+
+    def _load_initial_background(self, rectified: np.ndarray) -> np.ndarray | None:
+        """Load a frozen reference or optionally use the first rectified frame."""
+
+        if self.segmentation_config.get("reference_file"):
+            return load_background_reference(
+                self.segmentation_config,
+                base_directory=self.config_directory,
+                target_shape=rectified.shape[:2],
+            )
+        capture_first = self.live_config.get("capture_first_frame_as_background")
+        if capture_first is None:
+            # A background-reference mode without a configured file must still
+            # be runnable.  The first rectified frame is frozen once; it is not
+            # adapted later, so stationary obstacles cannot disappear.
+            capture_first = "background_reference" in self.segmentation_modes
+        if bool(capture_first):
+            return rectified.copy()
+        return None
+
+    def _configure_motion_detector(self, rectified: np.ndarray) -> GlobalMotionDetector | None:
+        """Create the optional ORB camera-movement detector."""
+
+        if not bool(self.motion_config.get("enabled", True)):
+            return None
+        return GlobalMotionDetector(
+            rectified,
+            translation_threshold_px=float(self.motion_config.get("translation_threshold_px", 4.0)),
+            rotation_threshold_deg=float(self.motion_config.get("rotation_threshold_deg", 1.5)),
+            minimum_matches=int(self.motion_config.get("minimum_matches", 20)),
+            maximum_features=int(self.motion_config.get("maximum_features", 1000)),
+        )
+
+    def _current_segmentation_config(self) -> dict[str, Any]:
+        """Return a copy with the UI-selected segmentation mode applied."""
+
+        config = dict(self.segmentation_config)
+        config["mode"] = self.segmentation_modes[self.state.segmentation_index]
+        return config
+
+    def _current_forcing_method(self) -> str:
+        """Return the UI-selected Poisson forcing method."""
+
+        return str(self.forcing_methods[self.state.forcing_index])
+
+    def _submit_if_needed(self, occupancy: np.ndarray, current_time_s: float, worker: PoissonWorker) -> tuple[bool, float]:
+        """Submit when geometry changed enough or the refresh deadline elapsed."""
+
+        fraction = changed_fraction(self._last_submitted_occupancy, occupancy)
+        due_to_change = fraction >= self.minimum_changed_fraction
+        due_to_time = current_time_s - self._last_submit_time_s >= self.maximum_submit_interval_s
+        if not due_to_change and not due_to_time:
+            return False, fraction
+        self._version_counter += 1
+        diagnostic_solve = (
+            self.laplacian_every_n_solves > 0
+            and self._version_counter % self.laplacian_every_n_solves == 0
+        )
+        worker.submit(
+            OccupancyTask(
+                version_id=self._version_counter,
+                submitted_time_s=current_time_s,
+                occupancy=np.asarray(occupancy, dtype=bool).copy(),
+                forcing_method=self._current_forcing_method(),
+                solver=self.poisson_solver,
+                compute_laplacian_check=diagnostic_solve,
+            )
+        )
+        self._last_submitted_occupancy = np.asarray(occupancy, dtype=bool).copy()
+        self._last_submit_time_s = current_time_s
+        return True, fraction
+
+    def _accept_new_snapshot(self, snapshot: PoissonSnapshot | None) -> bool:
+        """Update temporal h diagnostics when a newer accepted field arrives."""
+
+        if snapshot is None or snapshot.version_id == self._last_seen_snapshot_version:
+            return False
+        self._last_seen_snapshot_version = snapshot.version_id
+        self.poisson_rate.tick()
+        current_h = np.asarray(snapshot.record.result.h, dtype=float)
+        if self._previous_h is not None and self._previous_h.shape == current_h.shape and self._previous_h_time_s is not None:
+            delta_t = snapshot.submitted_time_s - self._previous_h_time_s
+            if delta_t > 0.0:
+                self._partial_h_t = (current_h - self._previous_h) / delta_t
+                snapshot.record.result.diagnostics["partial_h_t"] = {
+                    "delta_t_s": delta_t,
+                    "mean_abs": float(np.mean(np.abs(self._partial_h_t))),
+                    "max_abs": float(np.max(np.abs(self._partial_h_t))),
+                    "interpretation": "quasi_static_diagnostic_only",
+                }
+        self._previous_h = current_h.copy()
+        self._previous_h_time_s = snapshot.submitted_time_s
+        if self.snapshot_every_n_solves and snapshot.version_id % self.snapshot_every_n_solves == 0:
+            self.state.snapshot_requested = True
+        return True
+
+    def _save_snapshot(
+        self,
+        *,
+        frame: np.ndarray,
+        rectified: np.ndarray,
+        raw_mask: np.ndarray,
+        clean_mask: np.ndarray,
+        instantaneous: np.ndarray,
+        filtered: np.ndarray,
+        inflated: np.ndarray,
+        dashboard: np.ndarray,
+        snapshot: PoissonSnapshot | None,
+    ) -> None:
+        """Persist one synchronized diagnostic snapshot."""
+
+        directory = self.output_directory / "snapshots" / f"snapshot_{self._snapshot_counter:04d}"
+        self._snapshot_counter += 1
+        directory.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(directory / "frame.png"), frame)
+        cv2.imwrite(str(directory / "rectified.png"), rectified)
+        cv2.imwrite(str(directory / "raw_mask.png"), raw_mask)
+        cv2.imwrite(str(directory / "clean_mask.png"), clean_mask)
+        cv2.imwrite(str(directory / "dashboard.png"), dashboard)
+        np.savez_compressed(
+            directory / "occupancy_and_field.npz",
+            occupancy_instantaneous=instantaneous,
+            occupancy_filtered=filtered,
+            occupancy_inflated=inflated,
+            h=np.asarray(snapshot.record.result.h) if snapshot is not None else np.asarray([]),
+            grad_h=np.asarray(snapshot.record.result.grad_h) if snapshot is not None and snapshot.record.result.grad_h is not None else np.asarray([]),
+            partial_h_t=self._partial_h_t if self._partial_h_t is not None else np.asarray([]),
+        )
+        if snapshot is not None:
+            snapshot.record.result.save_summary_json(directory / "poisson_summary.json")
+            save_json(
+                directory / "poisson_validation.json",
+                {
+                    key: value
+                    for key, value in snapshot.record.validation.items()
+                    if key not in {"residual_field", "central_stencil_residual_field"}
+                },
+            )
+            if bool(self.output_config.get("save_3d_snapshots", True)):
+                save_live_poisson_surface(
+                    snapshot.record,
+                    directory / "poisson_surface_3d.png",
+                    workspace_size_m=self.workspace_size_m,
+                    dpi=int(self.output_config.get("snapshot_3d_dpi", 110)),
+                )
+
+    def _initialize_virtual_cbf(self) -> None:
+        """Initialize the optional virtual marker from YAML coordinates."""
+
+        if self._virtual_cbf is not None:
+            return
+        start = np.asarray(self.cbf_demo_config.get("position_xy_m", [0.5, 0.5]), dtype=float).reshape(2)
+        goal = np.asarray(
+            self.cbf_demo_config.get(
+                "goal_xy_m",
+                [self.workspace_size_m[0] - 0.5, self.workspace_size_m[1] - 0.5],
+            ),
+            dtype=float,
+        ).reshape(2)
+        self._virtual_cbf = VirtualCBFState(start, goal, perf_counter())
+
+    def _draw_virtual_cbf_demo(
+        self,
+        rectified: np.ndarray,
+        snapshot: PoissonSnapshot | None,
+        field_age_s: float,
+        *,
+        metric_map_valid: bool = True,
+    ) -> tuple[np.ndarray, dict[str, Any]]:
+        """Draw virtual nominal and safe velocity arrows without controlling hardware."""
+
+        canvas = rectified.copy()
+        if not self.state.cbf_demo_enabled:
+            return canvas, {"cbf_demo_status": "disabled"}
+        if not metric_map_valid:
+            return canvas, {"cbf_demo_status": "camera_moved_map_invalid"}
+        self._initialize_virtual_cbf()
+        assert self._virtual_cbf is not None
+        if snapshot is None:
+            return canvas, {"cbf_demo_status": "no_field"}
+        if field_age_s > float(self.cbf_demo_config.get("maximum_field_age_s", self.maximum_field_age_s)):
+            return canvas, {"cbf_demo_status": "field_too_old"}
+
+        geometry = GridGeometry(snapshot.record.result.h.shape, self.grid_spacing_yx)
+        sampler = GridFieldSampler(snapshot.record.result, geometry)
+        sampled = sampler.sample(self._virtual_cbf.position_xy)
+        if not sampled.valid or sampled.h is None or sampled.gradient_xy is None:
+            return canvas, {"cbf_demo_status": f"invalid_sample:{sampled.reason}"}
+
+        gain = float(self.cbf_demo_config.get("goal_gain", 1.0))
+        maximum_speed = float(self.cbf_demo_config.get("maximum_speed_mps", 0.5))
+        nominal = gain * (self._virtual_cbf.goal_xy - self._virtual_cbf.position_xy)
+        nominal_norm = float(np.linalg.norm(nominal))
+        if nominal_norm > maximum_speed and nominal_norm > 0.0:
+            nominal *= maximum_speed / nominal_norm
+        alpha = float(self.cbf_demo_config.get("alpha", 3.0))
+        box = CBFBox(CBFBoxConfig(mode="velocity", solver="closed_form", alpha=alpha))
+        filtered = box.filter_control(
+            SystemState(position=self._virtual_cbf.position_xy),
+            SafetySample(h=sampled.h, grad_h=sampled.gradient_xy, hessian_h=sampled.hessian_xy),
+            nominal,
+        )
+        safe = np.asarray(filtered.u_safe, dtype=float)
+        if filtered.solver_status != "optimal" or not np.all(np.isfinite(safe)):
+            return canvas, {
+                "cbf_demo_status": f"qp_failed:{filtered.solver_status}",
+                "cbf_demo_h": sampled.h,
+                "cbf_demo_gradient_norm": float(np.linalg.norm(sampled.gradient_xy)),
+                "cbf_demo_field_age_s": field_age_s,
+            }
+        now = perf_counter()
+        dt = min(0.1, max(0.0, now - self._virtual_cbf.last_update_time_s))
+        candidate = self._virtual_cbf.position_xy + dt * safe
+        if geometry.contains_xy(candidate) and not sampler.occupancy_at_xy(candidate):
+            self._virtual_cbf.position_xy = candidate
+        self._virtual_cbf.last_update_time_s = now
+
+        width_px, height_px = rectified.shape[1], rectified.shape[0]
+
+        def point_to_pixel(point_xy: np.ndarray) -> tuple[int, int]:
+            return (
+                int(round(point_xy[0] / self.workspace_size_m[0] * (width_px - 1))),
+                int(round(point_xy[1] / self.workspace_size_m[1] * (height_px - 1))),
+            )
+
+        origin = point_to_pixel(self._virtual_cbf.position_xy)
+        scale = float(self.cbf_demo_config.get("arrow_scale_px_per_mps", 120.0))
+        nominal_end = (int(round(origin[0] + scale * nominal[0])), int(round(origin[1] + scale * nominal[1])))
+        safe_end = (int(round(origin[0] + scale * safe[0])), int(round(origin[1] + scale * safe[1])))
+        goal_pixel = point_to_pixel(self._virtual_cbf.goal_xy)
+        cv2.circle(canvas, origin, 7, (255, 255, 255), -1)
+        cv2.circle(canvas, goal_pixel, 8, (255, 0, 255), 2)
+        cv2.arrowedLine(canvas, origin, nominal_end, (0, 165, 255), 2, tipLength=0.25)
+        cv2.arrowedLine(canvas, origin, safe_end, (0, 255, 0), 2, tipLength=0.25)
+        cv2.putText(
+            canvas,
+            f"virtual CBF: h={sampled.h:.3e}, residual={float(filtered.cbf_residual):.3e}",
+            (10, rectified.shape[0] - 14),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        return canvas, {
+            "cbf_demo_status": filtered.solver_status,
+            "cbf_demo_h": sampled.h,
+            "cbf_demo_gradient_norm": float(np.linalg.norm(sampled.gradient_xy)),
+            "cbf_demo_residual": filtered.cbf_residual,
+            "cbf_demo_field_age_s": field_age_s,
+        }
+
+    def _handle_key(self, key: int, rectified: np.ndarray) -> bool:
+        """Apply one keyboard command and return True when the loop should stop."""
+
+        if key == ord("q"):
+            return True
+        if key == ord("s"):
+            self.state.snapshot_requested = True
+        elif key == ord("r"):
+            self.state.recalibration_requested = True
+        elif key == ord("b"):
+            self._background_reference = rectified.copy()
+            cv2.imwrite(str(self.output_directory / "background_reference.png"), self._background_reference)
+            self.metrics.add_warning("background_reference_replaced_by_user")
+        elif key == ord("p"):
+            self.state.paused = not self.state.paused
+        elif key == ord("f"):
+            self.state.forcing_index = (self.state.forcing_index + 1) % len(self.forcing_methods)
+            self._last_submit_time_s = -np.inf
+        elif key == ord("m"):
+            self.state.segmentation_index = (self.state.segmentation_index + 1) % len(self.segmentation_modes)
+            self.temporal_filter.reset()
+            self._last_submitted_occupancy = None
+        elif key == ord("d"):
+            self.state.diagnostics_enabled = not self.state.diagnostics_enabled
+        elif key == ord("c"):
+            self.state.cbf_demo_enabled = not self.state.cbf_demo_enabled
+        return False
+
+    def _open_dashboard_writer(self, dashboard: np.ndarray, source_fps: float) -> None:
+        """Create the optional annotated dashboard video writer once dimensions are known."""
+
+        if not bool(self.output_config.get("record_dashboard_video", False)) or self._video_writer is not None:
+            return
+        fps = float(self.output_config.get("dashboard_video_fps", source_fps if source_fps > 0.0 else 15.0))
+        path = self.output_directory / "dashboard.avi"
+        self._video_writer = cv2.VideoWriter(
+            str(path),
+            cv2.VideoWriter_fourcc(*"MJPG"),
+            fps,
+            (dashboard.shape[1], dashboard.shape[0]),
+        )
+        if not self._video_writer.isOpened():
+            self._video_writer.release()
+            self._video_writer = None
+            self.metrics.add_warning("dashboard_video_writer_failed", path=str(path))
+
+    def run(self) -> LiveExperimentReport:
+        """Execute the full live pipeline until end-of-stream, key quit, or frame limit."""
+
+        source_cfg = self.live_config.get("source", {})
+        video = VideoSource(
+            self.source_value,
+            reconnection_attempts=int(source_cfg.get("reconnection_attempts", 2)),
+            reconnection_delay_s=float(source_cfg.get("reconnection_delay_s", 0.2)),
+        )
+        worker: PoissonWorker | None = None
+        calibration: CalibrationData | None = None
+        motion_detector: GlobalMotionDetector | None = None
+        frame_index = 0
+        stop_requested = False
+        last_frame: np.ndarray | None = None
+
+        try:
+            ok, first_frame, _timestamp = video.read()
+            if not ok or first_frame is None:
+                raise RuntimeError("The video source opened but did not provide an initial frame.")
+            calibration = self._initial_calibration(first_frame)
+            calibration.save(self.output_directory / "calibration.json")
+            first_rectified = rectify_image(first_frame, calibration)
+            self._background_reference = self._load_initial_background(first_rectified)
+            if self._background_reference is not None:
+                cv2.imwrite(str(self.output_directory / "background_reference.png"), self._background_reference)
+            motion_detector = self._configure_motion_detector(first_rectified)
+            worker = PoissonWorker(
+                grid_spacing_yx=self.grid_spacing_yx,
+                poisson_config=self.poisson_config,
+                metrics=self.metrics,
+            )
+            # Reopen the source after the blocking calibration/mission UI.
+            # This discards buffered MJPEG/RTSP frames accumulated while
+            # the user was selecting corners, START, and landing zones.
+            video.release()
+            video = VideoSource(
+                self.source_value,
+                reconnection_attempts=int(source_cfg.get("reconnection_attempts", 2)),
+                reconnection_delay_s=float(source_cfg.get("reconnection_delay_s", 0.2)),
+            )
+            
+            ok, fresh_frame, _timestamp = video.read()
+            if not ok or fresh_frame is None:
+                raise RuntimeError(
+                    "The video source could not provide a fresh frame after mission setup."
+                )
+            
+            pending_frame: np.ndarray | None = fresh_frame
+            while not stop_requested:
+                frame_start = perf_counter()
+                if self.maximum_frames is not None and frame_index >= self.maximum_frames:
+                    break
+                if pending_frame is not None:
+                    frame = pending_frame
+                    pending_frame = None
+                    capture_latency = 0.0
+                elif self.state.paused and last_frame is not None:
+                    frame = last_frame.copy()
+                    capture_latency = 0.0
+                else:
+                    capture_start = perf_counter()
+                    ok, frame, _capture_timestamp = video.read()
+                    capture_latency = perf_counter() - capture_start
+                    if not ok or frame is None:
+                        break
+                last_frame = frame.copy()
+                frame_index += 1
+                capture_fps = self.capture_rate.tick()
+
+                recalibrated_this_frame = False
+                if self.state.recalibration_requested:
+                    if self.headless:
+                        calibration = assume_top_down_calibration(
+                            frame.shape,
+                            output_size_px=self.rectified_size_px,
+                            workspace_size_m=self.workspace_size_m,
+                        )
+                    else:
+                        calibration = interactive_calibration(
+                            frame,
+                            output_size_px=self.rectified_size_px,
+                            workspace_size_m=self.workspace_size_m,
+                        )
+                    calibration.save(self.output_directory / "calibration.json")
+                    self.state.recalibration_requested = False
+                    recalibrated_this_frame = True
+                    self.temporal_filter.reset()
+                    self._last_submitted_occupancy = None
+                    recalibrated_this_frame = True
+
+                assert calibration is not None
+                rectification_start = perf_counter()
+                rectified = rectify_image(frame, calibration)
+                rectification_latency = perf_counter() - rectification_start
+                if recalibrated_this_frame:
+                    if motion_detector is None:
+                        motion_detector = self._configure_motion_detector(rectified)
+                    else:
+                        motion_detector.set_reference(rectified)
+                    self.metrics.add_warning("camera_motion_reference_reset_after_recalibration")
+
+                camera_moved = False
+                motion_estimate: MotionEstimate | None = None
+                if motion_detector is not None:
+                    if recalibrated_this_frame:
+                        # Calibration changes the camera-to-workspace mapping. Reset
+                        # the global-motion reference to the newly rectified frame so
+                        # the detector does not keep comparing against stale geometry.
+                        motion_detector.set_reference(rectified)
+                        motion_estimate = MotionEstimate(
+                            valid=True,
+                            moved=False,
+                            translation_px=0.0,
+                            rotation_deg=0.0,
+                            inlier_ratio=1.0,
+                            match_count=0,
+                            message="reference_reset_after_recalibration",
+                        )
+                    else:
+                        motion_estimate = motion_detector.estimate(rectified)
+                    camera_moved = bool(motion_estimate.valid and motion_estimate.moved)
+                    if camera_moved:
+                        self.metrics.add_warning(
+                            "camera_moved_map_not_metric",
+                            frame_index=frame_index,
+                            translation_px=motion_estimate.translation_px,
+                            rotation_deg=motion_estimate.rotation_deg,
+                        )
+
+                segmentation_start = perf_counter()
+                segmentation_config = self._current_segmentation_config()
+                segmentation = segment_image(
+                    rectified,
+                    segmentation_config,
+                    base_directory=self.config_directory,
+                    background_reference=self._background_reference,
+                    allow_interactive=not self.headless,
+                )
+                segmentation_latency = perf_counter() - segmentation_start
+
+                occupancy_start = perf_counter()
+                instantaneous = mask_to_occupancy(segmentation.clean_mask, self.grid_shape_yx)
+                filtered = self.temporal_filter.update(instantaneous)
+                inflation_radius = float(self.geometry_config.get("robot_radius_m", 0.0)) + float(
+                    self.geometry_config.get("perception_margin_m", 0.0)
+                )
+                inflated = inflate_occupancy_physical(filtered, inflation_radius, self.grid_spacing_yx)
+                occupancy_latency = perf_counter() - occupancy_start
+
+                submitted = False
+                occupancy_change = changed_fraction(self._last_submitted_occupancy, inflated)
+                if not camera_moved:
+                    submitted, occupancy_change = self._submit_if_needed(inflated, perf_counter(), worker)
+
+                snapshot = worker.latest_snapshot()
+                new_snapshot = self._accept_new_snapshot(snapshot)
+                if new_snapshot and snapshot is not None and self.snapshot_every_n_solves:
+                    self.state.snapshot_requested = snapshot.version_id % self.snapshot_every_n_solves == 0
+                field_age_s = snapshot.age_s if snapshot is not None else np.inf
+                poisson_result = snapshot.record.result if snapshot is not None else None
+                field_stale = snapshot is not None and field_age_s > self.maximum_field_age_s
+
+                annotated_rectified, cbf_metrics = self._draw_virtual_cbf_demo(
+                    rectified,
+                    snapshot,
+                    field_age_s,
+                    metric_map_valid=not camera_moved,
+                )
+                validation = snapshot.record.validation.get("result", {}) if snapshot is not None else {}
+                dashboard_metrics: dict[str, Any] = {
+                    "capture_fps": capture_fps,
+                    "display_fps": self.display_rate.rate,
+                    "poisson_updates_per_s": self.poisson_rate.rate,
+                    "last_solve_time_s": snapshot.record.wall_time_s if snapshot is not None else 0.0,
+                    "field_age_s": field_age_s if np.isfinite(field_age_s) else 0.0,
+                    "poisson_residual": validation.get("residual_max_abs", np.nan),
+                    "grid_shape": f"{self.grid_shape_yx[1]}x{self.grid_shape_yx[0]}",
+                    "forcing_method": self._current_forcing_method(),
+                    "solver": self.poisson_solver,
+                    **cbf_metrics,
+                }
+                warnings: list[str] = []
+                if camera_moved:
+                    warnings.append("CAMERA MOVED - MAP NOT METRIC")
+                if field_stale:
+                    warnings.append(f"POISSON FIELD STALE: {1000.0 * field_age_s:.0f} ms")
+                if snapshot is None:
+                    warnings.append("WAITING FOR FIRST VALID POISSON FIELD")
+                dashboard = render_live_dashboard(
+                    original_bgr=frame,
+                    rectified_bgr=annotated_rectified,
+                    obstacle_mask=segmentation.clean_mask,
+                    occupancy=inflated,
+                    poisson_result=poisson_result,
+                    metrics=dashboard_metrics,
+                    warnings=warnings,
+                    panel_size=tuple(self.output_config.get("dashboard_panel_size", [420, 280])),
+                )
+                display_fps = self.display_rate.tick()
+                self._last_dashboard = dashboard
+                self._open_dashboard_writer(dashboard, video.nominal_fps)
+                if self._video_writer is not None:
+                    self._video_writer.write(dashboard)
+
+                pipeline_latency = perf_counter() - frame_start
+                frame_row = {
+                    "frame_index": frame_index,
+                    "frame_time_s": frame_start,
+                    "capture_latency_s": capture_latency,
+                    "rectification_latency_s": rectification_latency,
+                    "segmentation_latency_s": segmentation_latency,
+                    "occupancy_preprocessing_latency_s": occupancy_latency,
+                    "pipeline_latency_s": pipeline_latency,
+                    "capture_fps": capture_fps,
+                    "display_fps": display_fps,
+                    "poisson_updates_per_s": self.poisson_rate.rate,
+                    "poisson_version": snapshot.version_id if snapshot is not None else None,
+                    "field_age_s": field_age_s if np.isfinite(field_age_s) else None,
+                    "last_solve_time_s": snapshot.record.wall_time_s if snapshot is not None else None,
+                    "poisson_residual": validation.get("residual_max_abs"),
+                    "forcing_method": self._current_forcing_method(),
+                    "solver": self.poisson_solver,
+                    "grid_nx": self.grid_shape_yx[1],
+                    "grid_ny": self.grid_shape_yx[0],
+                    "occupied_fraction_instantaneous": float(np.mean(instantaneous)),
+                    "occupied_fraction_filtered": float(np.mean(filtered)),
+                    "occupied_fraction_inflated": float(np.mean(inflated)),
+                    "changed_fraction": occupancy_change,
+                    "submitted_poisson_task": submitted,
+                    "camera_moved": camera_moved,
+                    "camera_translation_px": motion_estimate.translation_px if motion_estimate is not None else None,
+                    "camera_rotation_deg": motion_estimate.rotation_deg if motion_estimate is not None else None,
+                    "field_stale": field_stale,
+                    "dropped_capture_frames": 0,
+                    "discarded_queued_tasks": worker.queue.discarded_items,
+                    "discarded_obsolete_solves": worker.discarded_obsolete_solves,
+                    "queue_size": worker.queue.qsize(),
+                    "queue_maximum_observed_size": worker.queue.maximum_observed_size,
+                    **cbf_metrics,
+                }
+                if self._partial_h_t is not None:
+                    frame_row["partial_h_t_mean_abs"] = float(np.mean(np.abs(self._partial_h_t)))
+                    frame_row["partial_h_t_max_abs"] = float(np.max(np.abs(self._partial_h_t)))
+                self.metrics.add_frame(frame_row)
+
+                if self.state.snapshot_requested:
+                    self._save_snapshot(
+                        frame=frame,
+                        rectified=rectified,
+                        raw_mask=segmentation.raw_mask,
+                        clean_mask=segmentation.clean_mask,
+                        instantaneous=instantaneous,
+                        filtered=filtered,
+                        inflated=inflated,
+                        dashboard=dashboard,
+                        snapshot=snapshot,
+                    )
+                    self.state.snapshot_requested = False
+
+                if not self.headless:
+                    cv2.imshow("Phone Stream to Poisson", dashboard)
+                    key = cv2.waitKey(1) & 0xFF
+                    stop_requested = self._handle_key(key, rectified)
+
+        finally:
+            if worker is not None:
+                worker.close(timeout_s=float(self.live_config.get("worker_shutdown_timeout_s", 15.0)))
+            video.release()
+            if self._video_writer is not None:
+                self._video_writer.release()
+                self._video_writer = None
+            if not self.headless:
+                cv2.destroyAllWindows()
+            summary = self.metrics.save(self.output_directory)
+            latest_snapshot = worker.latest_snapshot() if worker is not None else None
+            if latest_snapshot is not None:
+                latest_snapshot.record.result.save_npz(self.output_directory / "last_valid_field.npz")
+                latest_snapshot.record.result.save_summary_json(
+                    self.output_directory / "last_valid_field_summary.json"
+                )
+                save_json(
+                    self.output_directory / "last_valid_field_validation.json",
+                    {
+                        key: value
+                        for key, value in latest_snapshot.record.validation.items()
+                        if key not in {"residual_field", "central_stencil_residual_field"}
+                    },
+                )
+            solve_rows = self.metrics.solve_rows
+            worker_summary = {
+                "worker_queue_max_observed": worker.queue.maximum_observed_size if worker is not None else 0,
+                "discarded_queued_tasks": worker.queue.discarded_items if worker is not None else 0,
+                "discarded_obsolete_solves": worker.discarded_obsolete_solves if worker is not None else 0,
+                "accepted_solves": int(sum(bool(row.get("accepted", False)) for row in solve_rows)),
+                "failed_solves": worker.failed_solves if worker is not None else 0,
+                "invalid_solves": worker.invalid_solves if worker is not None else 0,
+            }
+            summary["worker"] = worker_summary
+            save_json(self.output_directory / "summary.json", summary)
+            save_yaml(self.output_directory / "effective_config.yaml", self.config)
+            save_json(
+                self.output_directory / "runtime_state.json",
+                {
+                    "source": self.source_value,
+                    "headless": self.headless,
+                    "maximum_frames": self.maximum_frames,
+                    "metrics_summary": summary,
+                    "queue_maximum_observed_size": worker_summary["worker_queue_max_observed"],
+                    "discarded_queued_tasks": worker_summary["discarded_queued_tasks"],
+                    "discarded_obsolete_solves": worker_summary["discarded_obsolete_solves"],
+                    "reconnections": video.reconnections,
+                },
+            )
+
+        if worker is None:
+            raise RuntimeError("The live pipeline terminated before the Poisson worker was initialized.")
+        return LiveExperimentReport(
+            output_directory=self.output_directory,
+            frames_processed=frame_index,
+            metrics_path=self.output_directory / "metrics.csv",
+            summary_path=self.output_directory / "summary.json",
+            runtime_state_path=self.output_directory / "runtime_state.json",
+            queue_maximum_observed_size=worker.queue.maximum_observed_size,
+            discarded_queued_tasks=worker.queue.discarded_items,
+            discarded_obsolete_solves=worker.discarded_obsolete_solves,
+            reconnections=video.reconnections,
+        )

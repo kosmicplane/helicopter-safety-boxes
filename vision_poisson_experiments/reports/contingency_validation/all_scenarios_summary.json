@@ -1,0 +1,207 @@
+{
+  "active_zone_blocked": {
+    "collision": false,
+    "final_position_xy_m": [
+      1.9496866262656856,
+      3.7256047324349284
+    ],
+    "final_target": 4,
+    "hjr_solve_time_s": {
+      "count": 2,
+      "maximum": 0.07289717599996948,
+      "mean": 0.06443374349987607
+    },
+    "hold": false,
+    "hold_reason": null,
+    "maximum_omega_active": 0.0,
+    "maximum_omega_contingency": 0.0,
+    "minimum_active_hj_residual": 3.862590253755034,
+    "minimum_contingency_residual": 1.066310905140269,
+    "minimum_effective_h": 0.2742494926664174,
+    "minimum_pivot": 2.7422835533724648,
+    "minimum_poisson_cbf_residual": 0.3833386376152467,
+    "minimum_raw_poisson_h": 0.2842494926664174,
+    "minimum_reachable_count": 3,
+    "optimizer_solve_time_s": {
+      "count": 77,
+      "maximum": 0.0006798430003982503,
+      "mean": 0.00047581471429336265
+    },
+    "optimizer_success_fraction": 1.0,
+    "poisson_solve_time_s": {
+      "count": 2,
+      "maximum": 0.04495857599977171,
+      "mean": 0.043966742499833344
+    },
+    "scenario": "active_zone_blocked",
+    "switch_events": [
+      {
+        "new_identifier": 4,
+        "new_value": 4.922448184158279,
+        "occupancy_version": 2,
+        "previous_identifier": 1,
+        "previous_value": null,
+        "reason": "synthetic validation diversion",
+        "time_s": 3.0
+      }
+    ],
+    "switches": 1,
+    "target_reached": true
+  },
+  "camera_moved": {
+    "collision": false,
+    "final_position_xy_m": [
+      1.942819326964866,
+      1.5474481841582792
+    ],
+    "final_target": 1,
+    "hjr_solve_time_s": {
+      "count": 1,
+      "maximum": 0.07108224200010227,
+      "mean": 0.07108224200010227
+    },
+    "hold": true,
+    "hold_reason": "camera moved; metric map invalid",
+    "maximum_omega_active": 0.0,
+    "maximum_omega_contingency": 0.0,
+    "minimum_active_hj_residual": 7.957892525494378,
+    "minimum_contingency_residual": 1.2727174255619316,
+    "minimum_effective_h": 0.3421774445889275,
+    "minimum_pivot": 2.7422835533724648,
+    "minimum_poisson_cbf_residual": 0.3833386376152467,
+    "minimum_raw_poisson_h": 0.3521774445889275,
+    "minimum_reachable_count": 4,
+    "optimizer_solve_time_s": {
+      "count": 30,
+      "maximum": 0.0006651610001426889,
+      "mean": 0.0005109383666573801
+    },
+    "optimizer_success_fraction": 1.0,
+    "poisson_solve_time_s": {
+      "count": 1,
+      "maximum": 0.042158394000125554,
+      "mean": 0.042158394000125554
+    },
+    "scenario": "camera_moved",
+    "switch_events": [],
+    "switches": 0,
+    "target_reached": false
+  },
+  "clear_active": {
+    "collision": false,
+    "final_position_xy_m": [
+      5.083385151474489,
+      1.128531015424737
+    ],
+    "final_target": 1,
+    "hjr_solve_time_s": {
+      "count": 2,
+      "maximum": 0.07136178499968082,
+      "mean": 0.07056741899987173
+    },
+    "hold": false,
+    "hold_reason": null,
+    "maximum_omega_active": 0.0,
+    "maximum_omega_contingency": 0.0,
+    "minimum_active_hj_residual": 6.730285963008619,
+    "minimum_contingency_residual": 1.2727174255619316,
+    "minimum_effective_h": 0.025173090063459642,
+    "minimum_pivot": 2.7422835533724648,
+    "minimum_poisson_cbf_residual": -7.765546539140189e-10,
+    "minimum_raw_poisson_h": 0.035173090063459644,
+    "minimum_reachable_count": 4,
+    "optimizer_solve_time_s": {
+      "count": 99,
+      "maximum": 0.0012784939999619382,
+      "mean": 0.0005010553939409691
+    },
+    "optimizer_success_fraction": 1.0,
+    "poisson_solve_time_s": {
+      "count": 2,
+      "maximum": 0.04629343799979324,
+      "mean": 0.04521249899994473
+    },
+    "scenario": "clear_active",
+    "switch_events": [],
+    "switches": 0,
+    "target_reached": true
+  },
+  "contingency_lost": {
+    "collision": false,
+    "final_position_xy_m": [
+      1.942819326964866,
+      1.5474481841582792
+    ],
+    "final_target": 1,
+    "hjr_solve_time_s": {
+      "count": 2,
+      "maximum": 0.07120282999994743,
+      "mean": 0.044172161500000584
+    },
+    "hold": true,
+    "hold_reason": "CONTINGENCY REQUIREMENT LOST",
+    "maximum_omega_active": 0.0,
+    "maximum_omega_contingency": 0.0,
+    "minimum_active_hj_residual": 7.957892525494378,
+    "minimum_contingency_residual": 1.2727174255619316,
+    "minimum_effective_h": 0.3421774445889275,
+    "minimum_pivot": null,
+    "minimum_poisson_cbf_residual": 0.3833386376152467,
+    "minimum_raw_poisson_h": 0.3521774445889275,
+    "minimum_reachable_count": 1,
+    "optimizer_solve_time_s": {
+      "count": 30,
+      "maximum": 0.0006164579999676789,
+      "mean": 0.0005024858667184162
+    },
+    "optimizer_success_fraction": 1.0,
+    "poisson_solve_time_s": {
+      "count": 2,
+      "maximum": 0.044246675000067626,
+      "mean": 0.04022282800019639
+    },
+    "scenario": "contingency_lost",
+    "switch_events": [],
+    "switches": 0,
+    "target_reached": false
+  },
+  "corridor_blocked": {
+    "collision": false,
+    "final_position_xy_m": [
+      5.083283535602822,
+      0.9009646965698445
+    ],
+    "final_target": 1,
+    "hjr_solve_time_s": {
+      "count": 2,
+      "maximum": 0.07067027399989456,
+      "mean": 0.06926937100001851
+    },
+    "hold": false,
+    "hold_reason": null,
+    "maximum_omega_active": 5.99523689958287e-17,
+    "maximum_omega_contingency": 1.1990473799165738e-16,
+    "minimum_active_hj_residual": 6.175263801712617,
+    "minimum_contingency_residual": 1.1059038820441762,
+    "minimum_effective_h": 0.0077840880262035495,
+    "minimum_pivot": 2.7422835533724648,
+    "minimum_poisson_cbf_residual": -2.4419620492377447e-10,
+    "minimum_raw_poisson_h": 0.01778408802620355,
+    "minimum_reachable_count": 4,
+    "optimizer_solve_time_s": {
+      "count": 102,
+      "maximum": 0.0009119820001615153,
+      "mean": 0.0005010467156638447
+    },
+    "optimizer_success_fraction": 1.0,
+    "poisson_solve_time_s": {
+      "count": 2,
+      "maximum": 0.04203141499965568,
+      "mean": 0.04106588649983678
+    },
+    "scenario": "corridor_blocked",
+    "switch_events": [],
+    "switches": 0,
+    "target_reached": true
+  }
+}

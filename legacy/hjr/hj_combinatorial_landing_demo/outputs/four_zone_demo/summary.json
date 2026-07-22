@@ -1,0 +1,27 @@
+{
+  "landed": true,
+  "collision": false,
+  "switched_target": true,
+  "final_active_zone": "LZ-3",
+  "final_position": [
+    13.213486518739767,
+    12.757494231562386,
+    1.3192883502973907
+  ],
+  "simulation_time_s": 14.52,
+  "required_reachable": 2,
+  "minimum_reachable_count": 3,
+  "minimum_pivot_value": 6.598730117745621,
+  "minimum_poisson_h": 0.10547731178648788,
+  "minimum_poisson_residual": -2.331717173509329e-09,
+  "minimum_active_hj_residual": 13.106789221566476,
+  "qp_success_fraction": 1.0,
+  "mean_qp_solve_ms": 0.44281531178266514,
+  "final_zone_values": [
+    -1000.0,
+    14.875433676026736,
+    24.458343228649976,
+    15.476676207396885
+  ],
+  "model_note": "HJ reachability is exact for the reduced single-integrator model p_dot=u with isotropic speed bound and static grid obstacles. It is not a full 6-DOF PX4 model."
+}

@@ -1,0 +1,33 @@
+grid_spacing:
+- 0.06338028169014084
+- 0.06315789473684211
+boundary_value: 0.0
+outer_boundary_as_dirichlet: true
+forcing_method: average_flux
+solver: sparse_direct
+compute_gradient: true
+compute_hessian: true
+compute_laplacian_check: true
+plot: false
+save_outputs: false
+constant:
+  c: 1.0
+distance:
+  alpha: 0.5
+average_flux:
+  b_bar: -1.0
+guidance:
+  beta: 8.0
+  base_flux_strength: 0.5
+  target_mean_abs_scale: 0.35
+  nonuniform_axis: null
+  nonuniform_gain: 0.0
+sor:
+  omega: 1.75
+  max_iter: 10000
+  tolerance: 1.0e-09
+  residual_check_interval: 25
+  warm_start: false
+conjugate_gradient:
+  tolerance: 1.0e-07
+  max_iter: 2500

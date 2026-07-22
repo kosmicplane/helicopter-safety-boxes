@@ -1,0 +1,102 @@
+{
+  "active_identifier": 4,
+  "hold_reason": null,
+  "required_reachable": 2,
+  "states": {
+    "1": {
+      "assessment": {
+        "blocked_now": false,
+        "connected_to_free_space": true,
+        "inflated_occupied_fraction": 0.0,
+        "minimum_clearance_m": 0.19047619047619047,
+        "raw_occupied_fraction": 0.0,
+        "reasons": [],
+        "valid_seed_cells": 21,
+        "zone_identifier": 1
+      },
+      "blocked_frames": 2,
+      "clear_frames": 0,
+      "clearance_m": 0.19047619047619047,
+      "geodesic_distance_m": null,
+      "identifier": 1,
+      "reachability_value": null,
+      "reachable": false,
+      "rejection_reason": "inflated occupied fraction exceeds threshold; minimum obstacle clearance is too small",
+      "state": "REJECTED"
+    },
+    "2": {
+      "assessment": {
+        "blocked_now": false,
+        "connected_to_free_space": true,
+        "inflated_occupied_fraction": 0.0,
+        "minimum_clearance_m": 0.19148936170212766,
+        "raw_occupied_fraction": 0.0,
+        "reasons": [],
+        "valid_seed_cells": 21,
+        "zone_identifier": 2
+      },
+      "blocked_frames": 0,
+      "clear_frames": 63,
+      "clearance_m": 0.19148936170212766,
+      "geodesic_distance_m": 4.493140721790366,
+      "identifier": 2,
+      "reachability_value": 0.5068592782096344,
+      "reachable": true,
+      "rejection_reason": null,
+      "state": "AVAILABLE"
+    },
+    "3": {
+      "assessment": {
+        "blocked_now": false,
+        "connected_to_free_space": true,
+        "inflated_occupied_fraction": 0.0,
+        "minimum_clearance_m": 1.119971887958447,
+        "raw_occupied_fraction": 0.0,
+        "reasons": [],
+        "valid_seed_cells": 22,
+        "zone_identifier": 3
+      },
+      "blocked_frames": 0,
+      "clear_frames": 63,
+      "clearance_m": 1.119971887958447,
+      "geodesic_distance_m": 3.5629873679995163,
+      "identifier": 3,
+      "reachability_value": 1.4370126320004837,
+      "reachable": true,
+      "rejection_reason": null,
+      "state": "AVAILABLE"
+    },
+    "4": {
+      "assessment": {
+        "blocked_now": false,
+        "connected_to_free_space": true,
+        "inflated_occupied_fraction": 0.0,
+        "minimum_clearance_m": 0.19148936170212766,
+        "raw_occupied_fraction": 0.0,
+        "reasons": [],
+        "valid_seed_cells": 22,
+        "zone_identifier": 4
+      },
+      "blocked_frames": 0,
+      "clear_frames": 63,
+      "clearance_m": 0.19148936170212766,
+      "geodesic_distance_m": 0.3967905515549664,
+      "identifier": 4,
+      "reachability_value": 4.603209448445034,
+      "reachable": true,
+      "rejection_reason": null,
+      "state": "ACTIVE"
+    }
+  },
+  "switch_events": [
+    {
+      "new_identifier": 4,
+      "new_value": 3.9162694009922148,
+      "occupancy_version": 15,
+      "previous_identifier": 1,
+      "previous_value": null,
+      "reason": "inflated occupied fraction exceeds threshold; minimum obstacle clearance is too small",
+      "time_s": 3173.206508154
+    }
+  ]
+}

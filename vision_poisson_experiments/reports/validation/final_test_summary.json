@@ -1,0 +1,20 @@
+{
+  "cbf_safety_box": {
+    "failed": 0,
+    "passed": 9,
+    "pytest_seconds": 1.04
+  },
+  "editable_install_imports": "OK",
+  "poisson_safety_box": {
+    "failed": 0,
+    "passed": 6,
+    "pytest_seconds": 0.77
+  },
+  "total_failed": 0,
+  "total_passed": 24,
+  "vision_poisson_experiments": {
+    "failed": 0,
+    "passed": 9,
+    "pytest_seconds": 12.87
+  }
+}

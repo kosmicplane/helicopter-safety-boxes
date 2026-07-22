@@ -1,0 +1,140 @@
+{
+  "shape": [
+    80,
+    80
+  ],
+  "h_min": 0.0008993863150713451,
+  "h_max": 0.5194078498566477,
+  "h_mean": 0.14844554378276031,
+  "forcing_min": -28.2042455820687,
+  "forcing_max": -5.460386750055786e-12,
+  "free_cells": 5752,
+  "solve_cells": 5278,
+  "boundary_cells": 474,
+  "solver_info": {
+    "solver": "sor",
+    "elapsed_time": 0.017637652000303206,
+    "iterations": 121,
+    "converged": true,
+    "residual_history": [
+      0.17340480845416198,
+      0.008759797778084333,
+      0.0025608846254639994,
+      0.0008009403482751587,
+      0.0002546002069530595,
+      9.839436565084458e-05
+    ],
+    "max_change": 9.839436565084458e-05,
+    "unknowns": 5278,
+    "residual": {
+      "max_abs": 18.942408151117334,
+      "l2": 0.7009877235625765
+    }
+  },
+  "timing": {
+    "domain": 6.680100068479078e-05,
+    "forcing": 0.03802400000040507,
+    "solve": 0.017826516999775777,
+    "derivatives": 0.0002717790002861875
+  },
+  "diagnostics": {
+    "forcing": {
+      "method": "guidance",
+      "beta": 10.0,
+      "target_mean_abs": 0.35,
+      "divergence": {
+        "shape": [
+          80,
+          80
+        ],
+        "dtype": "float64"
+      },
+      "component_solver_info": [
+        {
+          "solver": "sor",
+          "elapsed_time": 0.02089864200024749,
+          "iterations": 139,
+          "converged": true,
+          "residual_history": [
+            0.5678442789644174,
+            0.009269598458957778,
+            0.003698863664728158,
+            0.0013684989948705706,
+            0.0004917998467766638,
+            0.00017533308938355585,
+            9.829110230163973e-05
+          ],
+          "max_change": 9.829110230163973e-05,
+          "unknowns": 5278,
+          "residual": {
+            "max_abs": 26.11903109553441,
+            "l2": 1.8973651813570316
+          }
+        },
+        {
+          "solver": "sor",
+          "elapsed_time": 0.015808490000381425,
+          "iterations": 108,
+          "converged": true,
+          "residual_history": [
+            0.47995215588570167,
+            0.0051592753867084895,
+            0.0013840378939065645,
+            0.00044040213503951375,
+            0.00014049232579105286,
+            9.744102957209844e-05
+          ],
+          "max_change": 9.744102957209844e-05,
+          "unknowns": 5278,
+          "residual": {
+            "max_abs": 22.138212129514198,
+            "l2": 1.8891424775113461
+          }
+        }
+      ],
+      "signed_distance": {
+        "shape": [
+          80,
+          80
+        ],
+        "dtype": "float64"
+      },
+      "normals": {
+        "shape": [
+          80,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "boundary_vector": {
+        "shape": [
+          80,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "base_flux_strength": 0.5,
+      "guidance_vector": {
+        "shape": [
+          80,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "guidance_divergence": {
+        "shape": [
+          80,
+          80
+        ],
+        "dtype": "float64"
+      }
+    },
+    "laplacian_check": {
+      "max_abs_delta_h_minus_f": 18.942408151117334,
+      "l2_delta_h_minus_f": 0.7009877235625765
+    }
+  }
+}

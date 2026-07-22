@@ -1,0 +1,7 @@
+mode: backstepping
+solver: closed_form
+alpha: 2.0
+backstepping:
+  mu: 1.0
+  k1_type: gradient_ascent
+  k1_gain: 1.0

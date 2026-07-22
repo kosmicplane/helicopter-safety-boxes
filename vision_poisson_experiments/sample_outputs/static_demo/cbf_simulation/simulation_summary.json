@@ -1,0 +1,33 @@
+{
+  "configuration": {
+    "alpha": 0.2,
+    "component_bound_mode": "euclidean_conservative",
+    "dt_s": 0.02,
+    "enforce_control_bounds": false,
+    "goal_gain": 1.1,
+    "goal_tolerance_m": 0.1,
+    "h_tolerance": 1e-05,
+    "maximum_speed_mps": 0.8,
+    "maximum_step_backtracks": 14,
+    "maximum_steps": 1300,
+    "minimum_integration_dt_s": 1e-06,
+    "residual_tolerance": 1e-06,
+    "solver": "closed_form"
+  },
+  "goal_xy": [
+    5.6,
+    0.5
+  ],
+  "minimum_explicit_cbf_residual": -1.7520707107365752e-16,
+  "minimum_h": 0.035662143000319,
+  "nominal_collided": true,
+  "nominal_reached_goal": false,
+  "nominal_status": "collision_with_inflated_occupancy",
+  "safe_collided": false,
+  "safe_reached_goal": true,
+  "safe_status": "goal_reached",
+  "start_xy": [
+    0.4,
+    3.8
+  ]
+}

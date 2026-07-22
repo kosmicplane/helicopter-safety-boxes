@@ -1,0 +1,15 @@
+grid_spacing: [0.1, 0.1]
+forcing_method: guidance
+solver: sor
+compute_gradient: true
+compute_hessian: true
+plot: true
+sor:
+  omega: 1.75
+  max_iter: 1500
+  tolerance: 1.0e-4
+  residual_check_interval: 25
+guidance:
+  beta: 10.0
+  base_flux_strength: 0.5
+  target_mean_abs_scale: 0.35

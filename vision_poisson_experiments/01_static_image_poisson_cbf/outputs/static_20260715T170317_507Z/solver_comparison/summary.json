@@ -1,0 +1,79 @@
+{
+  "conjugate_gradient": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 3.54888953779664e-08,
+    "exact_residual_rms": 9.75667509072393e-09,
+    "solver_info": {
+      "elapsed_time": 0.024421401001745835,
+      "grid_spacing": [
+        0.05084745762711865,
+        0.05063291139240506
+      ],
+      "info_code": 0,
+      "ndim": 2,
+      "nonzeros": 18320,
+      "residual": {
+        "l2": 0.8339369201842727,
+        "max_abs": 12.724492977428387
+      },
+      "solver": "conjugate_gradient",
+      "unknowns": 3766
+    },
+    "valid": true,
+    "wall_time_s": 0.024815951997879893
+  },
+  "sor": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 0.008459462443454413,
+    "exact_residual_rms": 0.0031167798907886513,
+    "solver_info": {
+      "converged": true,
+      "elapsed_time": 0.026169388998823706,
+      "iterations": 237,
+      "max_change": 9.834109090278709e-06,
+      "residual": {
+        "l2": 0.8336540075267757,
+        "max_abs": 12.717925776880936
+      },
+      "residual_history": [
+        0.003097483573950744,
+        0.007311040208517416,
+        0.003552904620625852,
+        0.0016342345264771518,
+        0.0007439145291302518,
+        0.00033795000072667225,
+        0.00015346334313326437,
+        6.968170146853803e-05,
+        3.163907225134377e-05,
+        1.4365680141570358e-05,
+        9.834109090278709e-06
+      ],
+      "solver": "sor",
+      "unknowns": 3766
+    },
+    "valid": false,
+    "wall_time_s": 0.026598500000545755
+  },
+  "sparse_direct": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 4.263256414560601e-13,
+    "exact_residual_rms": 5.501442109544883e-14,
+    "solver_info": {
+      "elapsed_time": 0.024321809003595263,
+      "grid_spacing": [
+        0.05084745762711865,
+        0.05063291139240506
+      ],
+      "ndim": 2,
+      "nonzeros": 18320,
+      "residual": {
+        "l2": 0.8339369202982889,
+        "max_abs": 12.72449298577533
+      },
+      "solver": "sparse_direct",
+      "unknowns": 3766
+    },
+    "valid": true,
+    "wall_time_s": 0.024717307001992594
+  }
+}

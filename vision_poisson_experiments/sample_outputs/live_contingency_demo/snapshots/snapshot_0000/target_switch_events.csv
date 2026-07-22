@@ -1,0 +1,2 @@
+time_s,previous_identifier,new_identifier,reason,occupancy_version,previous_value,new_value
+3173.206508154,1,4,inflated occupied fraction exceeds threshold; minimum obstacle clearance is too small,15,,3.9162694009922148

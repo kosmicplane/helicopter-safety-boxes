@@ -1,0 +1,39 @@
+{
+  "collision": false,
+  "final_position_xy_m": [
+    5.083385151474489,
+    1.128531015424737
+  ],
+  "final_target": 1,
+  "hjr_solve_time_s": {
+    "count": 2,
+    "maximum": 0.07136178499968082,
+    "mean": 0.07056741899987173
+  },
+  "hold": false,
+  "hold_reason": null,
+  "maximum_omega_active": 0.0,
+  "maximum_omega_contingency": 0.0,
+  "minimum_active_hj_residual": 6.730285963008619,
+  "minimum_contingency_residual": 1.2727174255619316,
+  "minimum_effective_h": 0.025173090063459642,
+  "minimum_pivot": 2.7422835533724648,
+  "minimum_poisson_cbf_residual": -7.765546539140189e-10,
+  "minimum_raw_poisson_h": 0.035173090063459644,
+  "minimum_reachable_count": 4,
+  "optimizer_solve_time_s": {
+    "count": 99,
+    "maximum": 0.0012784939999619382,
+    "mean": 0.0005010553939409691
+  },
+  "optimizer_success_fraction": 1.0,
+  "poisson_solve_time_s": {
+    "count": 2,
+    "maximum": 0.04629343799979324,
+    "mean": 0.04521249899994473
+  },
+  "scenario": "clear_active",
+  "switch_events": [],
+  "switches": 0,
+  "target_reached": true
+}

@@ -1,0 +1,175 @@
+{
+  "diagnostics": {
+    "forcing": {
+      "base_flux_strength": 0.5,
+      "beta": 8.0,
+      "boundary_vector": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96,
+          2
+        ]
+      },
+      "component_solver_info": [
+        {
+          "elapsed_time": 0.03878209499816876,
+          "grid_spacing": [
+            0.06338028169014084,
+            0.06315789473684211
+          ],
+          "ndim": 2,
+          "nonzeros": 22828,
+          "residual": {
+            "l2": 5.351387332086273,
+            "max_abs": 51.577384079082776
+          },
+          "solver": "sparse_direct",
+          "unknowns": 4696
+        },
+        {
+          "elapsed_time": 0.03335757199965883,
+          "grid_spacing": [
+            0.06338028169014084,
+            0.06315789473684211
+          ],
+          "ndim": 2,
+          "nonzeros": 22828,
+          "residual": {
+            "l2": 7.0741052699707065,
+            "max_abs": 65.97337311868762
+          },
+          "solver": "sparse_direct",
+          "unknowns": 4696
+        }
+      ],
+      "divergence": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96
+        ]
+      },
+      "guidance_divergence": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96
+        ]
+      },
+      "guidance_vector": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96,
+          2
+        ]
+      },
+      "method": "guidance",
+      "normals": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96,
+          2
+        ]
+      },
+      "signed_distance": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96
+        ]
+      },
+      "target_mean_abs": 0.35
+    },
+    "laplacian_check": {
+      "l2_delta_h_minus_f": 0.6483657497978668,
+      "max_abs_delta_h_minus_f": 11.364100859722893
+    }
+  },
+  "forcing_method": "guidance",
+  "solver": "sparse_direct",
+  "solver_info": {
+    "elapsed_time": 0.03167031400516862,
+    "grid_spacing": [
+      0.06338028169014084,
+      0.06315789473684211
+    ],
+    "ndim": 2,
+    "nonzeros": 22828,
+    "residual": {
+      "l2": 0.6483657497978668,
+      "max_abs": 11.364100859722893
+    },
+    "solver": "sparse_direct",
+    "unknowns": 4696
+  },
+  "timing": {
+    "derivatives": 0.00026112400519195944,
+    "domain": 6.400100392056629e-05,
+    "forcing": 0.07346634400164476,
+    "solve": 0.03184221800620435
+  },
+  "validation": {
+    "boundary_abs_max": 0.0,
+    "boundary_cells": 582,
+    "boundary_ok": true,
+    "central_stencil_residual_l2": 7.440754158952403e-15,
+    "central_stencil_residual_max_abs": 6.294964549624638e-14,
+    "finite_gradient": true,
+    "finite_h": true,
+    "finite_hessian": true,
+    "h_max_solve": 0.13064115102369378,
+    "h_mean_solve": 0.0373953189663209,
+    "h_min_solve": 8.323337933504938e-05,
+    "input": {
+      "free_cells": 5278,
+      "fully_free": false,
+      "occupied_cells": 1634,
+      "occupied_fraction": 0.23640046296296297,
+      "shape_yx": [
+        72,
+        96
+      ]
+    },
+    "residual_count": 4696,
+    "residual_l2": 7.56594693835275e-15,
+    "residual_max_abs": 6.553091402849986e-14,
+    "residual_ok": true,
+    "result": {
+      "boundary_abs_max": 0.0,
+      "boundary_cells": 582,
+      "boundary_ok": true,
+      "central_stencil_residual_l2": 7.440754158952403e-15,
+      "central_stencil_residual_max_abs": 6.294964549624638e-14,
+      "finite_gradient": true,
+      "finite_h": true,
+      "finite_hessian": true,
+      "h_max_solve": 0.13064115102369378,
+      "h_mean_solve": 0.0373953189663209,
+      "h_min_solve": 8.323337933504938e-05,
+      "residual_count": 4696,
+      "residual_l2": 7.56594693835275e-15,
+      "residual_max_abs": 6.553091402849986e-14,
+      "residual_ok": true,
+      "solve_cells": 4696,
+      "solver_ok": true,
+      "solver_status": "unknown",
+      "tolerances": {
+        "boundary": 1e-08,
+        "residual": 1e-05
+      },
+      "valid": true
+    },
+    "solve_cells": 4696,
+    "solver_ok": true,
+    "solver_status": "unknown",
+    "tolerances": {
+      "boundary": 1e-08,
+      "residual": 1e-05
+    },
+    "valid": true
+  },
+  "wall_time_s": 0.10566132499661762
+}

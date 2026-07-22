@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safety-box-core"
+version = "0.1.0"
+description = "Shared immutable contracts and configuration for modular safety boxes"
+requires-python = ">=3.10"
+authors = [{name = "Juan Esteban Beron"}]
+dependencies = [
+  "numpy>=1.26",
+  "PyYAML>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

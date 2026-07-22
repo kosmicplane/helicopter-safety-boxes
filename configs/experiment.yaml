@@ -1,0 +1,241 @@
+runtime:
+  seed: 7
+  strict_reproducibility: true
+  output_root: outputs
+
+boxes:
+  poisson:
+    enabled: true
+    forcing_method: guidance
+    solver: conjugate_gradient
+    normalize_for_control: true
+    outer_boundary_as_dirichlet: true
+    compute_laplacian_check: true
+    constant:
+      c: 1.0
+    distance:
+      alpha: 0.5
+    average_flux:
+      b_bar: -1.0
+    guidance:
+      beta: 8.0
+      base_flux_strength: 0.5
+      target_mean_abs_scale: 0.35
+      nonuniform_axis: null
+      nonuniform_gain: 0.0
+    conjugate_gradient:
+      tolerance: 1.0e-7
+      max_iter: 3000
+    sor:
+      omega: 1.75
+      max_iter: 5000
+      tolerance: 1.0e-5
+      residual_check_interval: 25
+
+  cbf:
+    enabled: true
+    mode: acceleration_hocbf
+    gamma1: 1.1
+    gamma2: 1.1
+    velocity_gamma: 1.0
+    h_margin: 0.003
+    minimum_gradient_norm: 1.0e-9
+
+  clf:
+    enabled: true
+    lqr_q_position: 0.05
+    lqr_q_velocity: 0.10
+    lqr_r: 20.0
+    lyapunov_q: 1.0
+    roa_fraction: 0.96
+    manual_c: null
+    alpha:
+      type: linear
+      gain: 0.03
+
+  contingency:
+    enabled: true
+    required_certified: 2
+    alpha_gain: 0.16
+    rho_gain: 1.0
+    pivot_tolerance: 1.0e-8
+    hold_when_lost: true
+
+filter:
+  enabled: true
+  solver: hildreth
+  tolerance: 1.0e-8
+  max_iterations: 240
+  residual_tolerance: 1.0e-5
+  active_tolerance: 1.0e-5
+  omega_weight: 30.0
+  clf_slack_enabled: true
+  clf_slack_weight: 100000.0
+  clf_slack_max: 10000.0
+
+visualization:
+  dpi: 360
+  save_pdf: true
+  save_svg: true
+  live_dashboard_size_px: [1600, 900]
+  live_video_fps: 15.0
+  live_history_length: 240
+
+planner:
+  type: astar_pd
+  position_gain: 0.65
+  velocity_gain: 1.0
+  maximum_nominal_acceleration: 1.2
+  lookahead_distance_m: 1.5
+  clearance_weight: 2.0
+  minimum_clearance_cells: 1.0
+
+experiments:
+  predefined_world:
+    world:
+      extent_m: [18.0, 14.0, 10.0]
+      grid_shape: [32, 25, 18]
+      obstacle_inflation_m: 0.20
+      start_state: [1.0, 1.1, 8.6, 0.0, 0.0, 0.0]
+      landing_radius_m: 0.60
+      landing_zones:
+        - [16.7, 12.2, 0.85]
+        - [16.2, 2.4, 0.85]
+        - [13.6, 12.5, 0.85]
+        - [8.8, 1.8, 0.85]
+    simulation:
+      dt_s: 0.06
+      maximum_steps: 620
+      maximum_acceleration_mps2: 4.0
+      maximum_speed_component_mps: 2.4
+      initial_target: LZ0
+      failure_time_s: 10.0
+      failed_target: LZ0
+      landing_position_tolerance_m: 0.42
+      landing_speed_tolerance_mps: 0.32
+      nominal_position_gain: 0.8
+      nominal_velocity_gain: 1.2
+    sweeps:
+      hocbf_alpha_scales: [0.45, 0.65, 0.85, 1.1, 1.4, 1.8, 2.4]
+      clf_alpha_gains: [0.012, 0.018, 0.025, 0.03, 0.045, 0.065, 0.09]
+      roa_fractions: [0.55, 0.70, 0.85, 0.96]
+      forcing_methods: [constant, distance, average_flux, guidance]
+      poisson_solvers: [sparse_direct, conjugate_gradient, sor]
+      solver_forcing: constant
+
+  static_image:
+    workspace_size_m: [6.0, 4.0]
+    output_size_px: [360, 240]
+    robot_radius_m: 0.12
+    perception_margin_m: 0.06
+    assume_top_down: true
+    start_state: [0.50, 0.55, 0.0, 0.0]
+    landing_radius_m: 0.18
+    landing_zones:
+      - [5.30, 3.45]
+      - [5.15, 0.60]
+      - [0.85, 3.35]
+      - [3.40, 3.40]
+    simulation:
+      dt_s: 0.045
+      maximum_steps: 520
+      maximum_acceleration_mps2: 1
+      maximum_speed_component_mps: 2
+      initial_target: LZ0
+      failure_time_s: 7.0
+      failed_target: LZ0
+      landing_position_tolerance_m: 0.18
+      landing_speed_tolerance_mps: 0.18
+      nominal_position_gain: 0.9
+      nominal_velocity_gain: 1.3
+    segmentation:
+      mode: mask_file
+      mask_file: experiments/static_image/input/example_mask.png
+      cleanup:
+        invert: false
+        threshold: 127
+        open_kernel: 3
+        close_kernel: 5
+        minimum_component_area_px: 50
+        fill_holes: true
+
+  live_vision:
+    workspace_size_m: [6.0, 4.0]
+    output_size_px: [480, 320]
+    poisson_grid_shape_px: [160, 107]
+    robot_radius_m: 0.12
+    perception_margin_m: 0.06
+    #source: experiments/live_vision/assets/example_stream.avi
+    source: "http://10.8.5.210:8080/stream.mjpg"
+    background_file: experiments/live_vision/assets/example_background.png
+    capture_background_interactively: true
+    minimum_start_occupied_fraction: 0.0005
+    maximum_frames: 180
+    poisson_update_interval_frames: 10
+    occupancy_change_trigger: 0.005
+    maximum_field_age_s: 2.0
+    start_state: [0.50, 0.55, 0.0, 0.0]
+    landing_radius_m: 0.18
+    landing_zones:
+      - [5.30, 3.45]
+      - [5.15, 0.60]
+      - [0.85, 3.35]
+      - [3.40, 3.40]
+    simulation:
+      maximum_acceleration_mps2: 2.8
+      maximum_speed_component_mps: 1.7
+      initial_target: LZ0
+      failure_frame: 90
+      failed_target: LZ0
+      nominal_position_gain: 0.9
+      nominal_velocity_gain: 1.3
+    segmentation:
+      mode: background_reference
+      reference_file: experiments/live_vision/assets/example_background.png
+      background:
+        difference_threshold: 35
+        difference_blur_kernel: 5
+        use_color_norm: true
+      cleanup:
+        threshold: 127
+        open_kernel: 3
+        close_kernel: 5
+        minimum_component_area_px: 60
+        fill_holes: true
+
+profiles:
+  smoke:
+    visualization:
+      dpi: 120
+      save_pdf: false
+      save_svg: false
+    experiments:
+      predefined_world:
+        world:
+          grid_shape: [24, 19, 14]
+        simulation:
+          maximum_steps: 520
+        sweeps:
+          hocbf_alpha_scales: [0.65, 1.1, 1.8]
+          clf_alpha_gains: [0.018, 0.03, 0.065]
+          roa_fractions: [0.70, 0.96]
+      static_image:
+        output_size_px: [160, 107]
+        simulation:
+          maximum_steps: 520
+      live_vision:
+        output_size_px: [320, 213]
+        poisson_grid_shape_px: [96, 64]
+        maximum_frames: 60
+        simulation:
+          failure_frame: 30
+  no_contingency:
+    boxes:
+      contingency:
+        enabled: false
+  cbf_only:
+    boxes:
+      clf:
+        enabled: false
+      contingency:
+        enabled: false

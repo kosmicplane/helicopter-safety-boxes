@@ -1,0 +1,12 @@
+grid_spacing: [0.1, 0.1]
+forcing_method: constant
+solver: sor
+constant:
+  c: 1.0
+sor:
+  omega: 1.75
+  max_iter: 1500
+  tolerance: 1.0e-5
+conjugate_gradient:
+  tolerance: 1.0e-8
+  max_iter: 2000

@@ -1,0 +1,121 @@
+workspace:
+  width_m: 4.0
+  height_m: 3.0
+  grid:
+    nx: 80
+    ny: 60
+  rectified_image:
+    width_px: 640
+    height_px: 480
+calibration:
+  mode: interactive
+  file: null
+  save_reusable_file: calibration_static.json
+segmentation:
+  mode: hsv
+  mask_file: null
+  reference_file: null
+  tune_hsv_interactively: false
+  hsv:
+    lower:
+    - 0
+    - 0
+    - 0
+    upper:
+    - 179
+    - 255
+    - 105
+    invert: false
+  background:
+    difference_threshold: 35
+    difference_blur_kernel: 5
+    use_color_norm: true
+  cleanup:
+    blur_kernel: 3
+    threshold: 127
+    open_kernel: 5
+    close_kernel: 5
+    minimum_component_area_px: 80
+    fill_holes: true
+    invert: false
+  manual_correction:
+    enabled: false
+    brush_radius_px: 12
+occupancy:
+  robot_radius_m: 0.08
+  perception_margin_m: 0.04
+poisson:
+  forcing_methods:
+  - constant
+  - distance
+  - average_flux
+  - guidance
+  primary_forcing_method: constant
+  solver: sparse_direct
+  compare_solvers:
+  - sparse_direct
+  - conjugate_gradient
+  - sor
+  boundary_value: 0.0
+  outer_boundary_as_dirichlet: true
+  compute_gradient: true
+  compute_hessian: true
+  compute_laplacian_check: true
+  validation_boundary_tolerance: 1.0e-08
+  validation_residual_tolerance: 1.0e-05
+  constant:
+    c: 1.0
+  distance:
+    alpha: 0.55
+  average_flux:
+    b_bar: -1.0
+  guidance:
+    beta: 8.0
+    base_flux_strength: 0.5
+    target_mean_abs_scale: 0.35
+    nonuniform_axis: null
+    nonuniform_gain: 0.0
+  sor:
+    omega: 1.75
+    max_iter: 3500
+    tolerance: 1.0e-05
+    residual_check_interval: 25
+  conjugate_gradient:
+    tolerance: 1.0e-08
+    max_iter: 2500
+cbf:
+  enabled: true
+  interactive_start_goal: false
+  start_xy_m:
+  - 0.35
+  - 1.5
+  goal_xy_m:
+  - 3.65
+  - 1.5
+  solver: closed_form
+  alpha: 3.0
+  goal_gain: 1.25
+  maximum_speed_mps: 0.5
+  enforce_control_bounds: false
+  dt_s: 0.02
+  maximum_steps: 700
+  goal_tolerance_m: 0.06
+  h_tolerance: 0.003
+  residual_tolerance: 1.0e-07
+  maximum_step_backtracks: 14
+  minimum_integration_dt_s: 1.0e-06
+output:
+  root: outputs
+  figure_dpi: 135
+  quiver_stride: 5
+runtime:
+  image_path: /home/kosmicraft/ATMOS/Docker/workspace/Helicopter/vision_poisson_experiments/examples/assets/image.png
+  output_directory: /home/kosmicraft/ATMOS/Docker/workspace/Helicopter/vision_poisson_experiments/01_static_image_poisson_cbf/outputs/static_20260715T170317_507Z
+  headless: true
+  forcing_methods:
+  - constant
+  - distance
+  - average_flux
+  - guidance
+  selected_forcing_method: constant
+  solver: sparse_direct

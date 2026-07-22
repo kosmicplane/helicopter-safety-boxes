@@ -1,0 +1,73 @@
+{
+  "conjugate_gradient": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 3.287087935177624e-08,
+    "exact_residual_rms": 8.551218500753449e-09,
+    "solver_info": {
+      "elapsed_time": 0.020691644996986724,
+      "grid_spacing": [
+        0.05084745762711865,
+        0.05063291139240506
+      ],
+      "info_code": 0,
+      "ndim": 2,
+      "nonzeros": 14663,
+      "residual": {
+        "l2": 0.5954597512948011,
+        "max_abs": 6.064273672278092
+      },
+      "solver": "conjugate_gradient",
+      "unknowns": 3065
+    },
+    "valid": true,
+    "wall_time_s": 0.021130286004336085
+  },
+  "sor": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 0.007894880933271509,
+    "exact_residual_rms": 0.001957994154851753,
+    "solver_info": {
+      "converged": true,
+      "elapsed_time": 0.008384070002648514,
+      "iterations": 76,
+      "max_change": 9.863321592695762e-06,
+      "residual": {
+        "l2": 0.5953985211935687,
+        "max_abs": 6.062167843496809
+      },
+      "residual_history": [
+        0.003097483573950744,
+        0.0019455348058675381,
+        0.0001458891392323025,
+        1.0940179338780887e-05,
+        9.863321592695762e-06
+      ],
+      "solver": "sor",
+      "unknowns": 3065
+    },
+    "valid": false,
+    "wall_time_s": 0.00885619099426549
+  },
+  "sparse_direct": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 1.5631940186722204e-13,
+    "exact_residual_rms": 1.5901626150868848e-14,
+    "solver_info": {
+      "elapsed_time": 0.020148080999206286,
+      "grid_spacing": [
+        0.05084745762711865,
+        0.05063291139240506
+      ],
+      "ndim": 2,
+      "nonzeros": 14663,
+      "residual": {
+        "l2": 0.5954597512540762,
+        "max_abs": 6.064273671296666
+      },
+      "solver": "sparse_direct",
+      "unknowns": 3065
+    },
+    "valid": true,
+    "wall_time_s": 0.02059144099621335
+  }
+}

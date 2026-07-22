@@ -1,0 +1,77 @@
+{
+  "start_xy_m": [
+    0.3943661971830986,
+    4.293319415448852
+  ],
+  "source_start_px": [
+    42.0,
+    457.0
+  ],
+  "landing_zones": [
+    {
+      "identifier": 1,
+      "name": "LZ-1",
+      "center_xy_m": [
+        1.812206572769953,
+        0.5073068893528184
+      ],
+      "radius_m": 0.3,
+      "source_center_px": [
+        193.0,
+        54.0
+      ],
+      "priority": 1.0
+    },
+    {
+      "identifier": 2,
+      "name": "LZ-2",
+      "center_xy_m": [
+        3.661971830985916,
+        0.6858037578288101
+      ],
+      "radius_m": 0.3,
+      "source_center_px": [
+        390.0,
+        73.0
+      ],
+      "priority": 1.0
+    },
+    {
+      "identifier": 3,
+      "name": "LZ-3",
+      "center_xy_m": [
+        5.427230046948356,
+        0.8549060542797495
+      ],
+      "radius_m": 0.3,
+      "source_center_px": [
+        578.0,
+        91.0
+      ],
+      "priority": 1.0
+    },
+    {
+      "identifier": 4,
+      "name": "LZ-4",
+      "center_xy_m": [
+        4.976525821596244,
+        3.1659707724425887
+      ],
+      "radius_m": 0.3,
+      "source_center_px": [
+        530.0,
+        337.0
+      ],
+      "priority": 1.0
+    }
+  ],
+  "active_zone_identifier": 1,
+  "required_reachable": 1,
+  "p": 4,
+  "workspace_size_m": [
+    6.0,
+    4.5
+  ],
+  "calibration_hash": "9fa382183e0522b396418b2fe2daf00ef59c8c977cafe65f89f9abe54aea812a",
+  "created_utc": "2026-07-16T21:31:46.609847+00:00"
+}

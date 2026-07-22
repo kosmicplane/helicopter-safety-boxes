@@ -1,0 +1,49 @@
+{
+  "collision": false,
+  "final_position_xy_m": [
+    1.9496866262656856,
+    3.7256047324349284
+  ],
+  "final_target": 4,
+  "hjr_solve_time_s": {
+    "count": 2,
+    "maximum": 0.07289717599996948,
+    "mean": 0.06443374349987607
+  },
+  "hold": false,
+  "hold_reason": null,
+  "maximum_omega_active": 0.0,
+  "maximum_omega_contingency": 0.0,
+  "minimum_active_hj_residual": 3.862590253755034,
+  "minimum_contingency_residual": 1.066310905140269,
+  "minimum_effective_h": 0.2742494926664174,
+  "minimum_pivot": 2.7422835533724648,
+  "minimum_poisson_cbf_residual": 0.3833386376152467,
+  "minimum_raw_poisson_h": 0.2842494926664174,
+  "minimum_reachable_count": 3,
+  "optimizer_solve_time_s": {
+    "count": 77,
+    "maximum": 0.0006798430003982503,
+    "mean": 0.00047581471429336265
+  },
+  "optimizer_success_fraction": 1.0,
+  "poisson_solve_time_s": {
+    "count": 2,
+    "maximum": 0.04495857599977171,
+    "mean": 0.043966742499833344
+  },
+  "scenario": "active_zone_blocked",
+  "switch_events": [
+    {
+      "new_identifier": 4,
+      "new_value": 4.922448184158279,
+      "occupancy_version": 2,
+      "previous_identifier": 1,
+      "previous_value": null,
+      "reason": "synthetic validation diversion",
+      "time_s": 3.0
+    }
+  ],
+  "switches": 1,
+  "target_reached": true
+}

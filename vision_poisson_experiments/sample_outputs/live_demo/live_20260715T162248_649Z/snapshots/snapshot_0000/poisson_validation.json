@@ -1,0 +1,60 @@
+{
+  "boundary_abs_max": 0.0,
+  "boundary_cells": 275,
+  "boundary_ok": true,
+  "central_stencil_residual_l2": 9.913052047574804e-08,
+  "central_stencil_residual_max_abs": 4.2976468905830956e-07,
+  "finite_gradient": true,
+  "finite_h": true,
+  "finite_hessian": true,
+  "h_max_solve": 1.0240408321898968,
+  "h_mean_solve": 0.4230307577785174,
+  "h_min_solve": 0.004677141952121514,
+  "input": {
+    "free_cells": 2494,
+    "fully_free": false,
+    "occupied_cells": 578,
+    "occupied_fraction": 0.18815104166666666,
+    "shape_yx": [
+      48,
+      64
+    ]
+  },
+  "residual_count": 2219,
+  "residual_l2": 9.913052109313572e-08,
+  "residual_max_abs": 4.2976469671884843e-07,
+  "residual_ok": true,
+  "result": {
+    "boundary_abs_max": 0.0,
+    "boundary_cells": 275,
+    "boundary_ok": true,
+    "central_stencil_residual_l2": 9.913052047574804e-08,
+    "central_stencil_residual_max_abs": 4.2976468905830956e-07,
+    "finite_gradient": true,
+    "finite_h": true,
+    "finite_hessian": true,
+    "h_max_solve": 1.0240408321898968,
+    "h_mean_solve": 0.4230307577785174,
+    "h_min_solve": 0.004677141952121514,
+    "residual_count": 2219,
+    "residual_l2": 9.913052109313572e-08,
+    "residual_max_abs": 4.2976469671884843e-07,
+    "residual_ok": true,
+    "solve_cells": 2219,
+    "solver_ok": true,
+    "solver_status": "unknown",
+    "tolerances": {
+      "boundary": 1e-08,
+      "residual": 1e-05
+    },
+    "valid": true
+  },
+  "solve_cells": 2219,
+  "solver_ok": true,
+  "solver_status": "unknown",
+  "tolerances": {
+    "boundary": 1e-08,
+    "residual": 1e-05
+  },
+  "valid": true
+}

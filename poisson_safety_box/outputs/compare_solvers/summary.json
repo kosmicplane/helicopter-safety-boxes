@@ -1,0 +1,82 @@
+[
+  {
+    "solver": "sor",
+    "solver_info": {
+      "solver": "sor",
+      "elapsed_time": 0.02283883700147271,
+      "iterations": 160,
+      "converged": true,
+      "residual_history": [
+        0.012031250000000002,
+        0.016670550454695676,
+        0.0042637450229461304,
+        0.001084278130777383,
+        0.0002736831214872337,
+        6.866089225476824e-05,
+        1.7141799534159397e-05,
+        9.828825424440524e-06
+      ],
+      "max_change": 9.828825424440524e-06,
+      "unknowns": 4119,
+      "residual": {
+        "max_abs": 5.85602778909149,
+        "l2": 0.6402369897885302
+      }
+    },
+    "timing": {
+      "domain": 0.00010690699855331331,
+      "forcing": 8.613499812781811e-05,
+      "solve": 0.023172252011136152,
+      "derivatives": 0.0002563210000516847
+    }
+  },
+  {
+    "solver": "sparse_direct",
+    "solver_info": {
+      "solver": "sparse_direct",
+      "elapsed_time": 0.03521248399920296,
+      "unknowns": 4119,
+      "nonzeros": 20223,
+      "ndim": 2,
+      "grid_spacing": [
+        0.1,
+        0.1
+      ],
+      "residual": {
+        "max_abs": 5.856857824846905,
+        "l2": 0.6403047452475664
+      }
+    },
+    "timing": {
+      "domain": 0.00010838899470400065,
+      "forcing": 6.299599772319198e-05,
+      "solve": 0.035405234986683354,
+      "derivatives": 0.00022402599279303104
+    }
+  },
+  {
+    "solver": "conjugate_gradient",
+    "solver_info": {
+      "solver": "conjugate_gradient",
+      "elapsed_time": 0.028102818003389984,
+      "info_code": 0,
+      "unknowns": 4119,
+      "nonzeros": 20223,
+      "ndim": 2,
+      "grid_spacing": [
+        0.1,
+        0.1
+      ],
+      "residual": {
+        "max_abs": 5.856859197146565,
+        "l2": 0.6403047582038071
+      }
+    },
+    "timing": {
+      "domain": 0.0001660959969740361,
+      "forcing": 8.716800948604941e-05,
+      "solve": 0.02824260000488721,
+      "derivatives": 0.0002262960042571649
+    }
+  }
+]

@@ -1,0 +1,77 @@
+{
+  "start_xy_m": [
+    0.65,
+    0.75
+  ],
+  "source_start_px": [
+    34.0,
+    40.0
+  ],
+  "landing_zones": [
+    {
+      "identifier": 1,
+      "name": "LZ-1",
+      "center_xy_m": [
+        5.25,
+        0.75
+      ],
+      "radius_m": 0.25,
+      "source_center_px": [
+        280.0,
+        40.0
+      ],
+      "priority": 1.0
+    },
+    {
+      "identifier": 2,
+      "name": "LZ-2",
+      "center_xy_m": [
+        5.25,
+        3.75
+      ],
+      "radius_m": 0.25,
+      "source_center_px": [
+        280.0,
+        200.0
+      ],
+      "priority": 0.95
+    },
+    {
+      "identifier": 3,
+      "name": "LZ-3",
+      "center_xy_m": [
+        3.25,
+        4.0
+      ],
+      "radius_m": 0.25,
+      "source_center_px": [
+        173.0,
+        213.0
+      ],
+      "priority": 0.9
+    },
+    {
+      "identifier": 4,
+      "name": "LZ-4",
+      "center_xy_m": [
+        2.65,
+        0.55
+      ],
+      "radius_m": 0.25,
+      "source_center_px": [
+        141.0,
+        29.0
+      ],
+      "priority": 0.85
+    }
+  ],
+  "active_zone_identifier": 1,
+  "required_reachable": 2,
+  "p": 4,
+  "workspace_size_m": [
+    6.0,
+    4.5
+  ],
+  "calibration_hash": "synthetic-assume-top-down",
+  "created_utc": "2026-07-16T00:00:00+00:00"
+}

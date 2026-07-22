@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safety-filter-box"
+version = "0.1.0"
+description = "Unified verified optimization filter for modular certificate bundles"
+requires-python = ">=3.10"
+authors = [{name = "Juan Esteban Beron"}]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "safety-box-core>=0.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

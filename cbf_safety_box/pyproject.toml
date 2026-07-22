@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cbf_safety_box"
+version = "0.1.0"
+description = "Modular CBF-QP safety filter box consuming Poisson safety data"
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy", "matplotlib", "pyyaml"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cbf_safety_box*"]

@@ -1,0 +1,11 @@
+{
+  "discarded_obsolete_solves": 0,
+  "discarded_queued_tasks": 0,
+  "frames_processed": 60,
+  "metrics_path": "/mnt/data/Docker/Workspace/vision_poisson_experiments/sample_outputs/live_demo/live_20260715T162248_649Z/metrics.csv",
+  "output_directory": "/mnt/data/Docker/Workspace/vision_poisson_experiments/sample_outputs/live_demo/live_20260715T162248_649Z",
+  "queue_maximum_observed_size": 1,
+  "reconnections": 0,
+  "runtime_state_path": "/mnt/data/Docker/Workspace/vision_poisson_experiments/sample_outputs/live_demo/live_20260715T162248_649Z/runtime_state.json",
+  "summary_path": "/mnt/data/Docker/Workspace/vision_poisson_experiments/sample_outputs/live_demo/live_20260715T162248_649Z/summary.json"
+}

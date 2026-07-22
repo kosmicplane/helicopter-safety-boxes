@@ -1,0 +1,89 @@
+# Fast, fully headless validation configuration.
+# It still exercises every forcing method, all requested derivatives/diagnostics,
+# and a Poisson-connected CBF trajectory, but uses a smaller grid and lower plot DPI.
+workspace:
+  width_m: 6.0
+  height_m: 4.5
+  grid:
+    nx: 48
+    ny: 36
+  rectified_image:
+    width_px: 320
+    height_px: 240
+
+calibration:
+  mode: assume_top_down
+  file: null
+
+segmentation:
+  mode: mask_file
+  mask_file: ../examples/assets/static_mask.png
+  cleanup:
+    blur_kernel: 0
+    threshold: 127
+    open_kernel: 0
+    close_kernel: 3
+    minimum_component_area_px: 10
+    fill_holes: true
+    invert: false
+  manual_correction:
+    enabled: false
+
+geometry:
+  robot_radius_m: 0.12
+  perception_margin_m: 0.08
+
+poisson:
+  forcing_methods: [constant, distance, average_flux, guidance]
+  primary_forcing_method: constant
+  solver: sparse_direct
+  compare_solvers: false
+  boundary_value: 0.0
+  outer_boundary_as_dirichlet: true
+  compute_gradient: true
+  compute_hessian: true
+  compute_laplacian_check: true
+  constant:
+    c: 1.0
+  distance:
+    alpha: 0.5
+  average_flux:
+    b_bar: -1.0
+  guidance:
+    beta: 8.0
+    base_flux_strength: 0.5
+    target_mean_abs_scale: 0.35
+    nonuniform_axis: null
+    nonuniform_gain: 0.0
+  sor:
+    omega: 1.75
+    max_iter: 10000
+    tolerance: 1.0e-9
+    residual_check_interval: 25
+  conjugate_gradient:
+    tolerance: 1.0e-7
+    max_iter: 1800
+
+cbf:
+  enabled: true
+  interactive_start_goal: false
+  start_xy_m: [0.40, 3.80]
+  goal_xy_m: [5.60, 0.50]
+  alpha: 0.2
+  solver: closed_form
+  goal_gain: 1.1
+  dt_s: 0.02
+  maximum_steps: 1300
+  maximum_speed_mps: 0.80
+  goal_tolerance_m: 0.10
+  residual_tolerance: 1.0e-6
+  h_tolerance: 1.0e-5
+  enforce_control_bounds: false
+  component_bound_mode: euclidean_conservative
+  # Discrete Euler guard: rejected trial states are never applied.
+  maximum_step_backtracks: 14
+  minimum_integration_dt_s: 1.0e-6
+
+output:
+  root: outputs
+  figure_dpi: 60

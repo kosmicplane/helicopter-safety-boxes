@@ -1,0 +1,104 @@
+{
+  "diagnostics": {
+    "forcing": {
+      "alpha": 0.5,
+      "distance_map": {
+        "dtype": "float64",
+        "shape": [
+          72,
+          96
+        ]
+      },
+      "max_distance": 1.2,
+      "method": "distance"
+    },
+    "laplacian_check": {
+      "l2_delta_h_minus_f": 0.31142743534000605,
+      "max_abs_delta_h_minus_f": 3.3987820117704213
+    }
+  },
+  "forcing_method": "distance",
+  "solver": "sparse_direct",
+  "solver_info": {
+    "elapsed_time": 0.031810371998290066,
+    "grid_spacing": [
+      0.06338028169014084,
+      0.06315789473684211
+    ],
+    "ndim": 2,
+    "nonzeros": 22828,
+    "residual": {
+      "l2": 0.31142743534000605,
+      "max_abs": 3.3987820117704213
+    },
+    "solver": "sparse_direct",
+    "unknowns": 4696
+  },
+  "timing": {
+    "derivatives": 0.00027584199415287003,
+    "domain": 7.426799857057631e-05,
+    "forcing": 0.00026115299988305196,
+    "solve": 0.032005608998588286
+  },
+  "validation": {
+    "boundary_abs_max": 0.0,
+    "boundary_cells": 582,
+    "boundary_ok": true,
+    "central_stencil_residual_l2": 2.250203535975902e-14,
+    "central_stencil_residual_max_abs": 1.7541523789077473e-13,
+    "finite_gradient": true,
+    "finite_h": true,
+    "finite_hessian": true,
+    "h_max_solve": 0.34936903204434816,
+    "h_mean_solve": 0.11355236958777433,
+    "h_min_solve": 0.0003952132423617723,
+    "input": {
+      "free_cells": 5278,
+      "fully_free": false,
+      "occupied_cells": 1634,
+      "occupied_fraction": 0.23640046296296297,
+      "shape_yx": [
+        72,
+        96
+      ]
+    },
+    "residual_count": 4696,
+    "residual_l2": 2.2940922001684924e-14,
+    "residual_max_abs": 1.6209256159527285e-13,
+    "residual_ok": true,
+    "result": {
+      "boundary_abs_max": 0.0,
+      "boundary_cells": 582,
+      "boundary_ok": true,
+      "central_stencil_residual_l2": 2.250203535975902e-14,
+      "central_stencil_residual_max_abs": 1.7541523789077473e-13,
+      "finite_gradient": true,
+      "finite_h": true,
+      "finite_hessian": true,
+      "h_max_solve": 0.34936903204434816,
+      "h_mean_solve": 0.11355236958777433,
+      "h_min_solve": 0.0003952132423617723,
+      "residual_count": 4696,
+      "residual_l2": 2.2940922001684924e-14,
+      "residual_max_abs": 1.6209256159527285e-13,
+      "residual_ok": true,
+      "solve_cells": 4696,
+      "solver_ok": true,
+      "solver_status": "unknown",
+      "tolerances": {
+        "boundary": 1e-08,
+        "residual": 1e-05
+      },
+      "valid": true
+    },
+    "solve_cells": 4696,
+    "solver_ok": true,
+    "solver_status": "unknown",
+    "tolerances": {
+      "boundary": 1e-08,
+      "residual": 1e-05
+    },
+    "valid": true
+  },
+  "wall_time_s": 0.03264199099794496
+}

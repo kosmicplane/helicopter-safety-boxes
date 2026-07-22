@@ -1,0 +1,63 @@
+{
+  "u_safe": [
+    1.7600000000000047,
+    0.0
+  ],
+  "u_nom": [
+    -2.0,
+    0.0
+  ],
+  "was_filtered": true,
+  "cbf_residual": 4.884981308350689e-15,
+  "hocbf_residual": 4.884981308350689e-15,
+  "constraint_matrix": [
+    [
+      1.0,
+      0.0
+    ]
+  ],
+  "constraint_vector": [
+    1.7599999999999998
+  ],
+  "solver_status": "optimal",
+  "solve_time": 0.01858392199210357,
+  "active_constraints": [
+    0
+  ],
+  "diagnostics": {
+    "constraints": [
+      "acceleration_hocbf"
+    ],
+    "constraint_metadata": [
+      {
+        "alpha1": 2.0,
+        "alpha2": 2.0,
+        "h": 0.15,
+        "h_dot": -0.6,
+        "curvature": 0.04,
+        "rhs": 1.7599999999999998,
+        "psi1": -0.3
+      }
+    ],
+    "feasibility": {
+      "feasible": true,
+      "cbf_feasible": true,
+      "lower_feasible": true,
+      "upper_feasible": true,
+      "residuals": [
+        4.884981308350689e-15
+      ],
+      "min_residual": 4.884981308350689e-15
+    },
+    "command_metrics": {
+      "norm_u_nom": 2.0,
+      "norm_u_safe": 1.7600000000000047,
+      "correction_norm": 3.7600000000000047
+    },
+    "hocbf_metrics": {
+      "h_dot": -0.6,
+      "psi1": -0.3,
+      "curvature": 0.04
+    }
+  }
+}

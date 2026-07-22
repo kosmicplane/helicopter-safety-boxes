@@ -1,0 +1,104 @@
+workspace:
+  width_m: 6.0
+  height_m: 4.5
+  grid:
+    nx: 96
+    ny: 72
+  rectified_image:
+    width_px: 640
+    height_px: 480
+calibration:
+  mode: assume_top_down
+  file: null
+  save_reusable_file: calibration_synthetic.json
+segmentation:
+  mode: mask_file
+  mask_file: ../examples/assets/static_mask.png
+  reference_file: ../examples/assets/static_background.png
+  cleanup:
+    blur_kernel: 0
+    threshold: 127
+    open_kernel: 0
+    close_kernel: 3
+    minimum_component_area_px: 20
+    fill_holes: true
+    invert: false
+  manual_correction:
+    enabled: false
+geometry:
+  robot_radius_m: 0.12
+  perception_margin_m: 0.08
+poisson:
+  forcing_methods:
+  - constant
+  - distance
+  - average_flux
+  - guidance
+  primary_forcing_method: constant
+  solver: sparse_direct
+  compare_solvers:
+  - sparse_direct
+  - conjugate_gradient
+  - sor
+  boundary_value: 0.0
+  outer_boundary_as_dirichlet: true
+  compute_gradient: true
+  compute_hessian: true
+  compute_laplacian_check: true
+  validation_residual_tolerance: 1.0e-05
+  constant:
+    c: 1.0
+  distance:
+    alpha: 0.5
+  average_flux:
+    b_bar: -1.0
+  guidance:
+    beta: 8.0
+    base_flux_strength: 0.5
+    target_mean_abs_scale: 0.35
+    nonuniform_axis: null
+    nonuniform_gain: 0.0
+  sor:
+    omega: 1.75
+    max_iter: 10000
+    tolerance: 1.0e-09
+    residual_check_interval: 25
+  conjugate_gradient:
+    tolerance: 1.0e-07
+    max_iter: 2500
+cbf:
+  enabled: true
+  interactive_start_goal: false
+  start_xy_m:
+  - 0.4
+  - 3.8
+  goal_xy_m:
+  - 5.6
+  - 0.5
+  alpha: 0.2
+  solver: closed_form
+  goal_gain: 1.1
+  dt_s: 0.02
+  maximum_steps: 1300
+  maximum_speed_mps: 0.8
+  goal_tolerance_m: 0.1
+  residual_tolerance: 1.0e-06
+  h_tolerance: 1.0e-05
+  enforce_control_bounds: false
+  component_bound_mode: euclidean_conservative
+  maximum_step_backtracks: 14
+  minimum_integration_dt_s: 1.0e-06
+output:
+  root: outputs
+  figure_dpi: 120
+runtime:
+  image_path: /home/kosmicraft/ATMOS/Docker/workspace/Helicopter/vision_poisson_experiments/examples/assets/image.png
+  output_directory: /home/kosmicraft/ATMOS/Docker/workspace/Helicopter/vision_poisson_experiments/sample_outputs/static_demo
+  headless: true
+  forcing_methods:
+  - constant
+  - distance
+  - average_flux
+  - guidance
+  selected_forcing_method: constant
+  solver: sparse_direct

@@ -1,0 +1,193 @@
+{
+  "capture_fps": {
+    "count": 60,
+    "maximum": 13.694230912174978,
+    "mean": 7.872930768262729,
+    "median": 8.876344310485443,
+    "minimum": 0.0,
+    "p90": 10.663136577479095,
+    "p95": 11.166874022500945,
+    "p99": 12.680678488451687
+  },
+  "contingency": {
+    "controller_update_count": 46,
+    "enabled": true,
+    "final_active_target": 4,
+    "final_position_xy_m": [
+      2.4009420636303065,
+      0.6761362028899506
+    ],
+    "hold_reason": "active landing-zone disk reached",
+    "mission": {
+      "active_zone_identifier": 1,
+      "calibration_hash": "synthetic-assume-top-down",
+      "created_utc": "2026-07-16T00:00:00+00:00",
+      "landing_zones": [
+        {
+          "center_xy_m": [
+            5.25,
+            0.75
+          ],
+          "identifier": 1,
+          "name": "LZ-1",
+          "priority": 1.0,
+          "radius_m": 0.25,
+          "source_center_px": [
+            280.0,
+            40.0
+          ]
+        },
+        {
+          "center_xy_m": [
+            5.25,
+            3.75
+          ],
+          "identifier": 2,
+          "name": "LZ-2",
+          "priority": 0.95,
+          "radius_m": 0.25,
+          "source_center_px": [
+            280.0,
+            200.0
+          ]
+        },
+        {
+          "center_xy_m": [
+            3.25,
+            4.0
+          ],
+          "identifier": 3,
+          "name": "LZ-3",
+          "priority": 0.9,
+          "radius_m": 0.25,
+          "source_center_px": [
+            173.0,
+            213.0
+          ]
+        },
+        {
+          "center_xy_m": [
+            2.65,
+            0.55
+          ],
+          "identifier": 4,
+          "name": "LZ-4",
+          "priority": 0.85,
+          "radius_m": 0.25,
+          "source_center_px": [
+            141.0,
+            29.0
+          ]
+        }
+      ],
+      "p": 4,
+      "required_reachable": 2,
+      "source_start_px": [
+        34.0,
+        40.0
+      ],
+      "start_xy_m": [
+        0.65,
+        0.75
+      ],
+      "workspace_size_m": [
+        6.0,
+        4.5
+      ]
+    },
+    "switch_count": 1
+  },
+  "discarded_frames": 0,
+  "discarded_obsolete_solves": 0,
+  "discarded_queued_tasks": 0,
+  "display_fps": {
+    "count": 60,
+    "maximum": 10.623120597343808,
+    "mean": 8.20989642047091,
+    "median": 9.110166467810064,
+    "minimum": 0.0,
+    "p90": 10.32621529120709,
+    "p95": 10.368792157332376,
+    "p99": 10.556428492809658
+  },
+  "field_age_s": {
+    "count": 59,
+    "maximum": 2.2400302870000814,
+    "mean": 0.1641724301525447,
+    "median": 0.0986860380003236,
+    "minimum": 0.09225410800036116,
+    "p90": 0.1608900777997406,
+    "p95": 0.2356045005999467,
+    "p99": 1.3718376342800847
+  },
+  "field_update_latency_s": {
+    "count": 59,
+    "maximum": 0.740514512000118,
+    "mean": 0.1217889266101754,
+    "median": 0.09347113500007254,
+    "minimum": 0.0863910850002867,
+    "p90": 0.15269377439963136,
+    "p95": 0.1617685946996968,
+    "p99": 0.5317682223201615
+  },
+  "frame_count": 60,
+  "occupancy_preprocessing_latency_s": {
+    "count": 60,
+    "maximum": 0.0009878969999590481,
+    "mean": 0.00044246746667037464,
+    "median": 0.0004161414999543922,
+    "minimum": 0.00033538500019858475,
+    "p90": 0.0005113311000513931,
+    "p95": 0.0005905293500063632,
+    "p99": 0.000938539959815898
+  },
+  "pipeline_latency_s": {
+    "count": 60,
+    "maximum": 0.7131576470001164,
+    "mean": 0.12485183658333578,
+    "median": 0.09801573149979959,
+    "minimum": 0.06410257200013803,
+    "p90": 0.16564086290013622,
+    "p95": 0.2291219652502376,
+    "p99": 0.4718398979399021
+  },
+  "poisson_updates_per_s": {
+    "count": 60,
+    "maximum": 10.328156042924107,
+    "mean": 6.248764662768508,
+    "median": 6.038421478948562,
+    "minimum": 0.0,
+    "p90": 10.295936058855661,
+    "p95": 10.30857101495381,
+    "p99": 10.326999734118244
+  },
+  "segmentation_latency_s": {
+    "count": 60,
+    "maximum": 0.11005283699978463,
+    "mean": 0.02084085656666351,
+    "median": 0.018386099499821285,
+    "minimum": 0.0024156300000868214,
+    "p90": 0.038475768699936456,
+    "p95": 0.04327559384992127,
+    "p99": 0.10067510382992163
+  },
+  "solve_count": 59,
+  "solve_latency_s": {
+    "count": 59,
+    "maximum": 0.7144957559999057,
+    "mean": 0.09174421774578458,
+    "median": 0.06811909099951663,
+    "minimum": 0.06246684000007008,
+    "p90": 0.11853495020013724,
+    "p95": 0.12370783600031245,
+    "p99": 0.49900984254007263
+  },
+  "warning_count": 0,
+  "worker": {
+    "discarded_obsolete_solves": 0,
+    "discarded_queued_tasks": 0,
+    "failed_solves": 0,
+    "invalid_solves": 0,
+    "worker_queue_max_observed": 1
+  }
+}

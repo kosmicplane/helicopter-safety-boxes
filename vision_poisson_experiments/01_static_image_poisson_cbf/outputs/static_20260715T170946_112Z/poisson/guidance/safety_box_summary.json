@@ -1,0 +1,124 @@
+{
+  "shape": [
+    60,
+    80
+  ],
+  "h_min": 9.433997975889942e-06,
+  "h_max": 0.041157093562109226,
+  "h_mean": 0.009982166530230405,
+  "forcing_min": -6.88065164830473,
+  "forcing_max": -6.265095583096555e-13,
+  "free_cells": 3617,
+  "solve_cells": 3065,
+  "boundary_cells": 552,
+  "solver_info": {
+    "solver": "sparse_direct",
+    "elapsed_time": 0.020790850001503713,
+    "unknowns": 3065,
+    "nonzeros": 14663,
+    "ndim": 2,
+    "grid_spacing": [
+      0.05084745762711865,
+      0.05063291139240506
+    ],
+    "residual": {
+      "max_abs": 4.181355335727284,
+      "l2": 0.38475533349465507
+    }
+  },
+  "timing": {
+    "domain": 6.008600030327216e-05,
+    "forcing": 0.04064624999591615,
+    "solve": 0.020933074003551155,
+    "derivatives": 0.00021790299797430634
+  },
+  "diagnostics": {
+    "forcing": {
+      "method": "guidance",
+      "beta": 8.0,
+      "target_mean_abs": 0.35,
+      "divergence": {
+        "shape": [
+          60,
+          80
+        ],
+        "dtype": "float64"
+      },
+      "component_solver_info": [
+        {
+          "solver": "sparse_direct",
+          "elapsed_time": 0.01979271700110985,
+          "unknowns": 3065,
+          "nonzeros": 14663,
+          "ndim": 2,
+          "grid_spacing": [
+            0.05084745762711865,
+            0.05063291139240506
+          ],
+          "residual": {
+            "max_abs": 116.46581534571239,
+            "l2": 15.162535449645736
+          }
+        },
+        {
+          "solver": "sparse_direct",
+          "elapsed_time": 0.019747307000216097,
+          "unknowns": 3065,
+          "nonzeros": 14663,
+          "ndim": 2,
+          "grid_spacing": [
+            0.05084745762711865,
+            0.05063291139240506
+          ],
+          "residual": {
+            "max_abs": 89.39659817679645,
+            "l2": 13.249800650916738
+          }
+        }
+      ],
+      "signed_distance": {
+        "shape": [
+          60,
+          80
+        ],
+        "dtype": "float64"
+      },
+      "normals": {
+        "shape": [
+          60,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "boundary_vector": {
+        "shape": [
+          60,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "base_flux_strength": 0.5,
+      "guidance_vector": {
+        "shape": [
+          60,
+          80,
+          2
+        ],
+        "dtype": "float64"
+      },
+      "guidance_divergence": {
+        "shape": [
+          60,
+          80
+        ],
+        "dtype": "float64"
+      }
+    },
+    "laplacian_check": {
+      "max_abs_delta_h_minus_f": 4.181355335727284,
+      "l2_delta_h_minus_f": 0.38475533349465507
+    }
+  }
+}

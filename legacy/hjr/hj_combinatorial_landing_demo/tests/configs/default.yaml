@@ -1,0 +1,46 @@
+# Four-zone Mars landing contingency demonstration.
+world:
+  size_m: [20.0, 16.0, 10.0]
+  grid_shape: [36, 30, 20]
+  start: [1.4, 2.0, 8.4]
+  science_waypoint: [11.0, 8.0, 6.0]
+
+landing_zones:
+  - {name: LZ-1, center: [17.3, 11.7, 0.85], radius: 0.65, science_score: 1.00}
+  - {name: LZ-2, center: [17.1, 4.1, 0.85], radius: 0.65, science_score: 0.92}
+  - {name: LZ-3, center: [13.2, 12.8, 0.85], radius: 0.65, science_score: 0.82}
+  - {name: LZ-4, center: [12.8, 3.1, 0.85], radius: 0.65, science_score: 0.78}
+
+mission:
+  required_reachable: 2
+  active_target_initial: 0
+  active_horizon_s: 34.0
+  contingency_horizon_s: 11.5
+  discovery_time_s: 10.0
+  max_time_s: 34.0
+  dt_s: 0.12
+  landing_tolerance_m: 0.48
+  survey_tolerance_m: 1.0
+
+control:
+  max_speed_mps: 2.15
+  nominal_speed_mps: 1.70
+  nominal_gain: 0.85
+  poisson_cbf_alpha: 2.0
+  poisson_h_margin: 0.12
+  active_hj_alpha: 1.0
+  contingency_hj_alpha: 0.55
+  rho_gain: 2.0
+  omega_weight: 35.0
+  max_omega: 50.0
+
+poisson:
+  forcing_method: distance
+  solver: sparse_direct
+  distance_alpha: 0.55
+  cg_tolerance: 1.0e-6
+  cg_max_iter: 2500
+
+plots:
+  dpi: 220
+  save_pdf: false

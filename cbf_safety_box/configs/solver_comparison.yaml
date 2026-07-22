@@ -1,0 +1,4 @@
+mode: velocity
+alpha: 3.0
+control_lower_bound: [-3.0, -3.0]
+control_upper_bound: [3.0, 3.0]

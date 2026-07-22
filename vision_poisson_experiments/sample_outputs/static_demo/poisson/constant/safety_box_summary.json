@@ -1,0 +1,48 @@
+{
+  "shape": [
+    72,
+    96
+  ],
+  "h_min": 0.0016330378377479924,
+  "h_max": 0.4744711179639053,
+  "h_mean": 0.17655711905391264,
+  "forcing_min": -1.0,
+  "forcing_max": -1.0,
+  "free_cells": 5278,
+  "solve_cells": 4696,
+  "boundary_cells": 582,
+  "solver_info": {
+    "solver": "sparse_direct",
+    "elapsed_time": 0.04026966699893819,
+    "unknowns": 4696,
+    "nonzeros": 22828,
+    "ndim": 2,
+    "grid_spacing": [
+      0.06338028169014084,
+      0.06315789473684211
+    ],
+    "residual": {
+      "max_abs": 5.8525090612785355,
+      "l2": 0.6145580765226203
+    }
+  },
+  "timing": {
+    "domain": 9.999499889090657e-05,
+    "forcing": 6.791199848521501e-05,
+    "solve": 0.04048917099862592,
+    "derivatives": 0.0008471629989799112
+  },
+  "diagnostics": {
+    "forcing": {
+      "method": "constant",
+      "c": 1.0,
+      "min": -1.0,
+      "max": -1.0,
+      "mean": -1.0
+    },
+    "laplacian_check": {
+      "max_abs_delta_h_minus_f": 5.8525090612785355,
+      "l2_delta_h_minus_f": 0.6145580765226203
+    }
+  }
+}

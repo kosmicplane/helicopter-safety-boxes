@@ -1,0 +1,84 @@
+{
+  "conjugate_gradient": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 3.880712142745324e-07,
+    "exact_residual_rms": 9.444515004054597e-08,
+    "solver_info": {
+      "elapsed_time": 0.030077477000304498,
+      "grid_spacing": [
+        0.06338028169014084,
+        0.06315789473684211
+      ],
+      "info_code": 0,
+      "ndim": 2,
+      "nonzeros": 22828,
+      "residual": {
+        "l2": 0.6145580770233756,
+        "max_abs": 5.852509014271937
+      },
+      "solver": "conjugate_gradient",
+      "unknowns": 4696
+    },
+    "valid": true,
+    "wall_time_s": 0.03056760100298561
+  },
+  "sor": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 5.445194091180383e-07,
+    "exact_residual_rms": 1.5441965724172822e-07,
+    "solver_info": {
+      "converged": true,
+      "elapsed_time": 0.05324408699380001,
+      "iterations": 364,
+      "max_change": 9.997027650143764e-10,
+      "residual": {
+        "l2": 0.6145580683175732,
+        "max_abs": 5.852508894026201
+      },
+      "residual_history": [
+        0.004816037706710485,
+        0.008808794192596281,
+        0.0027344400356176246,
+        0.0008402442661209486,
+        0.0002581642820598251,
+        7.932179155245578e-05,
+        2.437193680759897e-05,
+        7.488378189590694e-06,
+        2.3008352839082313e-06,
+        7.069412005789033e-07,
+        2.1721062148927217e-07,
+        6.673886587815758e-08,
+        2.0505793618674772e-08,
+        6.300490462685104e-09,
+        1.9358515346290517e-09,
+        9.997027650143764e-10
+      ],
+      "solver": "sor",
+      "unknowns": 4696
+    },
+    "valid": true,
+    "wall_time_s": 0.06651540200255113
+  },
+  "sparse_direct": {
+    "boundary_abs_max": 0.0,
+    "exact_residual_max_abs": 2.4158453015843406e-13,
+    "exact_residual_rms": 3.259362890283089e-14,
+    "solver_info": {
+      "elapsed_time": 0.031159354002738837,
+      "grid_spacing": [
+        0.06338028169014084,
+        0.06315789473684211
+      ],
+      "ndim": 2,
+      "nonzeros": 22828,
+      "residual": {
+        "l2": 0.6145580765226203,
+        "max_abs": 5.8525090612785355
+      },
+      "solver": "sparse_direct",
+      "unknowns": 4696
+    },
+    "valid": true,
+    "wall_time_s": 0.03171564600052079
+  }
+}

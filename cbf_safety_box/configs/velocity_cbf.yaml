@@ -1,0 +1,9 @@
+mode: velocity
+solver: closed_form
+alpha: 3.0
+control_lower_bound: [-2.0, -2.0]
+control_upper_bound: [2.0, 2.0]
+plotting:
+  enabled: true
+  save: true
+  show: false
