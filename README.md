@@ -246,70 +246,263 @@ where $\delta_V\ge0$ is an explicitly penalized stability relaxation. Environmen
 
 **Implementation:** `clf_safety_box/src/clf_safety_box/`.
 
----
-
 ## 7. Candidate attraction regions and contingency
 
-A candidate CLF sublevel set is
+For each candidate landing site $j\in\{1,\ldots,p\}$, the corresponding local Control Lyapunov Function defines a candidate attraction region through the sublevel set
 
-$$
-\mathcal R_j(c_j)=\{x:V_j(x)\le c_j\}.
-$$
-
-Its zero-superlevel certificate is
-
-$$
-h_j^{\mathrm{ROA}}(x)=c_j-V_j(x),
-$$
-
-so that
-
-$$
-h_j^{\mathrm{ROA}}(x)\ge0
-\iff
-x\in\mathcal R_j(c_j).
-$$
-
-For $p$ candidate sites and a required count $r$, define the pivot
-
-$$
-\widetilde h_r(x)
+```math
+\mathcal{R}_j(c_j)
 =
-\max^{(r)}
 \left\{
- h_1^{\mathrm{ROA}}(x),\ldots,h_p^{\mathrm{ROA}}(x)
+x\in\mathbb{R}^{n}
+\mid
+V_j(x)\leq c_j
 \right\},
-$$
+```
 
-where $\max^{(r)}$ returns the $r$-th largest value. Therefore,
+where $c_j>0$ determines the size of the CLF sublevel set associated with the equilibrium $x_j^\star$.
 
-$$
-\widetilde h_r(x)\ge0
-$$
+The same region can be represented as the zero-superlevel set of the certificate
 
-means that at least $r$ candidate certificates are nonnegative.
+```math
+h_j^{\mathrm{ROA}}(x)
+=
+c_j-V_j(x).
+```
 
-The smooth combinatorial rows are
+Therefore,
 
-$$
-\dot h_j^{\mathrm{ROA}}(x,u)
-\ge
--\alpha_c\!\left(h_j^{\mathrm{ROA}}(x)\right)
--\omega\,
-\rho\!\left(h_j^{\mathrm{ROA}}(x)-\widetilde h_r(x)\right),
-$$
+```math
+h_j^{\mathrm{ROA}}(x)\geq 0
+\quad\Longleftrightarrow\quad
+x\in\mathcal{R}_j(c_j).
+```
 
-with one shared auxiliary variable $\omega\ge0$.
+A positive value of $h_j^{\mathrm{ROA}}$ indicates that the current state lies inside the candidate CLF sublevel set. A negative value indicates that the state lies outside that region.
+
+### 7.1 Combinatorial contingency requirement
+
+Assume that the mission contains $p$ candidate landing zones and requires at least $r$ of them to remain certified. The candidate certificate values are
+
+```math
+\left\{
+h_1^{\mathrm{ROA}}(x),
+h_2^{\mathrm{ROA}}(x),
+\ldots,
+h_p^{\mathrm{ROA}}(x)
+\right\}.
+```
+
+Define the combinatorial pivot as
+
+```math
+\widetilde{h}_r(x)
+=
+\max\nolimits^{(r)}
+\left\{
+h_1^{\mathrm{ROA}}(x),
+\ldots,
+h_p^{\mathrm{ROA}}(x)
+\right\},
+```
+
+where $\max^{(r)}$ denotes the $r$-th largest value among the $p$ candidate certificates.
+
+The combinatorial contingency condition is
+
+```math
+\widetilde{h}_r(x)\geq 0.
+```
+
+This condition holds if and only if at least $r$ candidate certificates are nonnegative. Equivalently, the state belongs to at least $r$ candidate CLF sublevel sets.
+
+The resulting combinatorial set is
+
+```math
+\mathcal{C}_r
+=
+\left\{
+x\in\mathbb{R}^{n}
+\mid
+\widetilde{h}_r(x)\geq 0
+\right\}.
+```
+
+Special cases include
+
+```math
+r=1
+\quad\Longrightarrow\quad
+\text{at least one candidate remains certified},
+```
+
+and
+
+```math
+r=p
+\quad\Longrightarrow\quad
+\text{all candidate regions must remain certified}.
+```
+
+### 7.2 Smooth combinatorial constraints
+
+Direct differentiation of the pivot is difficult because the identity of the $r$-th largest certificate can change as the state evolves. Instead of differentiating the nonsmooth order statistic directly, the controller imposes one smooth inequality for every candidate landing zone:
+
+```math
+\dot{h}_j^{\mathrm{ROA}}(x,u)
+\geq
+-\alpha_c
+\left(
+h_j^{\mathrm{ROA}}(x)
+\right)
+-
+\omega
+\rho
+\left(
+h_j^{\mathrm{ROA}}(x)
+-
+\widetilde{h}_r(x)
+\right),
+\qquad
+j=1,\ldots,p.
+```
+
+The shared auxiliary variable satisfies
+
+```math
+\omega\geq 0.
+```
+
+Here:
+
+- $\alpha_c$ is an extended class-$\mathcal{K}$ function controlling the admissible decrease of each candidate certificate;
+- $\rho$ weights each certificate according to its position relative to the current pivot;
+- $\omega$ is shared by all candidate constraints and enables the smooth combinatorial composition.
+
+Candidates whose certificate values are close to the pivot determine whether the $r$-out-of-$p$ condition is maintained. Candidates far above the pivot remain comfortably certified, while candidates far below it do not determine the current contingency boundary.
+
+For the control-affine reduced-order dynamics
+
+```math
+\dot{x}
+=
+f(x)+g(x)u,
+```
+
+the derivative of each attraction-region certificate is
+
+```math
+\dot{h}_j^{\mathrm{ROA}}(x,u)
+=
+\nabla h_j^{\mathrm{ROA}}(x)^{\mathsf{T}}
+\left(
+f(x)+g(x)u
+\right).
+```
+
+Because
+
+```math
+h_j^{\mathrm{ROA}}(x)
+=
+c_j-V_j(x),
+```
+
+its gradient is
+
+```math
+\nabla h_j^{\mathrm{ROA}}(x)
+=
+-\nabla V_j(x).
+```
+
+For the quadratic CLF
+
+```math
+V_j(x)
+=
+\left(
+x-x_j^\star
+\right)^{\mathsf{T}}
+P_j
+\left(
+x-x_j^\star
+\right),
+```
+
+the gradient becomes
+
+```math
+\nabla V_j(x)
+=
+2P_j
+\left(
+x-x_j^\star
+\right),
+```
+
+and therefore
+
+```math
+\nabla h_j^{\mathrm{ROA}}(x)
+=
+-2P_j
+\left(
+x-x_j^\star
+\right).
+```
+
+These expressions allow every combinatorial row to be written as an affine constraint in the control input whenever the system dynamics are control-affine.
+
+### 7.3 Target availability and state certification
+
+The implementation distinguishes between two different concepts:
+
+1. **Availability:** whether a landing zone has been declared operational by the mission logic.
+2. **Certification:** whether the current state satisfies the corresponding CLF sublevel certificate.
+
+A landing zone may be physically available but not certified from the current state. Conversely, a zone may have a positive CLF margin but be removed from consideration after an external failure declaration.
+
+The active contingency set is therefore determined using both logical availability and state-dependent certificate values.
+
+### 7.4 Target failure and safe retargeting
+
+When the active landing zone becomes unavailable, the target manager evaluates the remaining candidates and selects an alternative with a valid certificate and adequate contingency margin.
+
+The desired behavior is
+
+```text
+approach active landing zone
+→ detect landing-zone failure
+→ remove failed zone from the available set
+→ evaluate remaining CLF certificates
+→ select a certified alternative
+→ continue the safety-filtered approach
+```
+
+If fewer than $r$ available and certified alternatives remain, the requested contingency guarantee can no longer be maintained. The mission manager must then trigger a safe fallback mode instead of claiming that the original $r$-out-of-$p$ property still holds.
 
 <p align="center">
-  <img src="docs/assets/readme/contingency_roa_maps.png" alt="Contingency ROA maps and r-out-of-p pivot" width="900">
+  <img
+    src="docs/assets/readme/contingency_roa_maps.png"
+    alt="Candidate CLF attraction-region maps and the r-out-of-p contingency pivot"
+    width="900"
+  >
 </p>
 
-> **Interpretation of spatial plots.** The full CLF sublevel sets are six-dimensional position-velocity objects. Spatial ellipses, ellipsoids, or maps are projections or slices; they are not the complete state-space attraction regions.
+<p align="center">
+  <em>
+    Candidate CLF sublevel certificates and the corresponding
+    r-out-of-p contingency pivot evaluated over a spatial slice of
+    the full state space.
+  </em>
+</p>
 
-**Implementation:** `contingency_safety_box/src/contingency_safety_box/`.
+> **Interpretation of the spatial plots.** The complete CLF sublevel sets are defined in the full position–velocity state space. For the three-dimensional double-integrator model, the state space is six-dimensional. The spatial ellipses, ellipsoids, and maps shown above are fixed-velocity slices or projections and must not be interpreted as complete six-dimensional attraction regions.
 
----
+> **Current validation scope.** The implementation computes quadratic CLF sublevel certificates, evaluates their $r$-out-of-$p$ composition, and supports landing-zone invalidation and retargeting. A formal region-of-attraction claim additionally requires verifying that every selected sublevel set lies inside the domain where the local CLF decrease condition, input feasibility, model assumptions, and environmental safety constraints are jointly valid.
+
+**Implementation:** [`contingency_safety_box/src/contingency_safety_box/`](contingency_safety_box/src/contingency_safety_box/)
 
 ## 8. Unified minimum-intervention filter
 
