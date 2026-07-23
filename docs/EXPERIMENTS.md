@@ -1,37 +1,78 @@
 # Experiments
 
-## 1. Predefined 3-D world
+## 1. Complete predefined-world paper suite
 
-This is the primary controlled experiment for the first paper results. It tests a 3-D double integrator in an obstacle-rich world with four landing equilibria, Poisson-HOCBF collision avoidance, active-target CLF convergence, an `r=2` contingency requirement, and a programmed target failure.
-
-### Smoke validation
+The recommended entry point is:
 
 ```bash
-python experiments/predefined_world/run.py \
+bash scripts/run_paper_experiments.sh
+```
+
+It executes four controlled studies:
+
+```text
+01_baseline              obstacle-rich successful primary landing
+02_single_failure        certified diversion and successful contingency landing
+03_sequential_failure    repeated site failures ending in HOLD
+04_parameter_sweeps      no-failure HOCBF, CLF, and ROA studies
+```
+
+It also generates:
+
+```text
+00_cross_scenario_figures/paper_scenario_comparison.*
+paper_scenario_summary.csv
+paper_scenario_summary.json
+PAPER_FIGURE_INDEX.md
+```
+
+A fast structural check is:
+
+```bash
+bash scripts/run_paper_experiments.sh \
   --profile smoke \
-  --output outputs/runs/predefined_smoke
+  --skip-comparisons \
+  --skip-sweeps
 ```
 
-### Paper-resolution experiment and comparisons
+## 2. Individual predefined-world scenarios
+
+### Baseline landing
 
 ```bash
 python experiments/predefined_world/run.py \
+  --scenario baseline \
   --compare \
-  --output outputs/paper/predefined_world
+  --output outputs/paper/01_baseline
 ```
 
-The `--compare` option evaluates every configured Poisson forcing method and Poisson solver against the same geometry. Solver comparisons separate wall time, solve time, iterations, assembled-system residual, reconstructed-Laplacian error, and field error relative to the sparse-direct reference.
+### Single failure and diversion
 
-### Gain and ROA sweeps
+```bash
+python experiments/predefined_world/run.py \
+  --scenario single_failure \
+  --output outputs/paper/02_single_failure
+```
+
+### Sequential failures and HOLD
+
+```bash
+python experiments/predefined_world/run.py \
+  --scenario sequential_failure \
+  --output outputs/paper/03_sequential_failure
+```
+
+### Parameter sweeps
 
 ```bash
 python experiments/predefined_world/run_sweeps.py \
-  --output outputs/paper/parameter_sweeps
+  --scenario baseline \
+  --output outputs/paper/04_parameter_sweeps
 ```
 
-The script compares HOCBF gain scales, CLF decay gains, and ROA threshold fractions. It exports raw CSV data, metric panels, and 3-D plus orthogonal trajectory families.
+The sweep scenario is fixed to the no-failure baseline by default so that target-failure events do not confound HOCBF, CLF, ROA, forcing, or solver comparisons.
 
-## 2. Static-image experiment
+## 3. Static-image experiment
 
 ```bash
 python experiments/static_image/run.py \
@@ -40,9 +81,9 @@ python experiments/static_image/run.py \
   --output outputs/paper/static_image
 ```
 
-The image is rectified, segmented or paired with a supplied mask, inflated in metric units, converted to occupancy, and used to synthesize a Poisson field. The same controller and certificate stack used in the 3-D world is then applied in 2-D.
+The image is rectified, segmented or paired with a supplied mask, inflated in metric units, converted to occupancy, and used to synthesize a Poisson field. The same certificate stack is then evaluated in 2-D.
 
-## 3. Live vision
+## 4. Live vision
 
 ### Included video
 
@@ -62,33 +103,32 @@ python experiments/live_vision/run.py \
   --output outputs/live_camera
 ```
 
-The live mode uses a latest-only asynchronous Poisson worker. The control loop retains the newest valid versioned field while a replacement is being computed and reports field age, occupancy version, dropped tasks, filter status, and certificate histories.
+### IP stream
 
-## Reproducibility
+```bash
+python experiments/live_vision/run.py \
+  --source "http://CAMERA_IP:PORT/stream.mjpg" \
+  --display \
+  --output outputs/live_ip_camera
+```
+
+Interactive setup uses `B` to capture the empty background, `SPACE` to start, `R` to reset, and `Q` or `Esc` to stop and save.
+
+## 5. Reproducibility
 
 Every run saves:
 
-- the effective merged configuration;
-- a configuration hash and run metadata;
+- effective merged configuration;
+- run command and metadata;
 - CLF matrices and ROA thresholds;
-- raw CSV/JSON/NPZ data;
-- all figures in a dedicated directory.
+- raw CSV, JSON, and NPZ data;
+- publication figures;
+- solver residuals and timing.
 
-Use a timestamped output directory to retain independent runs:
+Use a timestamped output directory for independent runs:
 
 ```bash
 RUN_ID=$(date +%Y%m%d_%H%M%S)
-python experiments/predefined_world/run.py \
-  --output "outputs/runs/${RUN_ID}"
+python experiments/predefined_world/run_paper_suite.py \
+  --output "outputs/paper/mars_analog_suite_${RUN_ID}"
 ```
-
-## Recommended first-results matrix
-
-| Study | Independent variable | Required metrics |
-|---|---|---|
-| HOCBF sensitivity | \(\gamma_1,\gamma_2\) | minimum \(h_P\), HOCBF residual, intervention, path length, landing error |
-| CLF sensitivity | \(\alpha_V\) gain | CLF residual, CLF slack, settling time, intervention, terminal error |
-| ROA sensitivity | \(c_j\) fraction | projected volume, initial certified count, minimum pivot, landing success |
-| Forcing comparison | constant, distance, average flux, guidance | field geometry, minimum \(h_P\), intervention, solve time, trajectory |
-| Poisson solver comparison | sparse direct, CG, SOR | time, iterations, \(\|Ah-b\|\), \(\|\Delta_hh-f_P\|\), field error |
-| Architecture ablation | nominal, HOCBF, CLF, HOCBF+CLF, full contingency | safety, convergence, contingency, feasibility, time |

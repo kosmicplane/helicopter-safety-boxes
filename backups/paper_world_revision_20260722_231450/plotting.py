@@ -169,122 +169,6 @@ def _target_positions(controller: Any) -> dict[str, np.ndarray]:
     }
 
 
-
-def _terminal_plot_metadata(summary: Mapping[str, Any] | None) -> tuple[str, str, str]:
-    """Return a truthful terminal label, marker, and title fragment."""
-
-    summary = summary or {}
-    status = str(summary.get("terminal_status", ""))
-    if bool(summary.get("landed", False)) or status == "landed":
-        target = str(summary.get("final_target", "landing zone"))
-        return f"touchdown at {target}", "*", "successful landing"
-    if summary.get("hold_reason") is not None or status == "hold":
-        return "certified HOLD", "s", "certified HOLD"
-    return "simulation timeout", "x", "incomplete rollout"
-
-
-def _target_radius(target: Any) -> float:
-    metadata = getattr(target, "metadata", {})
-    try:
-        return float(metadata.get("radius_m", 0.6))
-    except AttributeError:
-        return 0.6
-
-
-def _draw_landing_zones_3d(axis: Any, controller: Any) -> None:
-    """Draw landing disks rather than only target-center points."""
-
-    theta = np.linspace(0.0, 2.0 * np.pi, 120)
-    for identifier, target in controller.targets.items():
-        point = np.asarray(target.x_star[: controller.dimension], dtype=float)
-        radius = _target_radius(target)
-        if controller.dimension == 3:
-            axis.plot(
-                point[0] + radius * np.cos(theta),
-                point[1] + radius * np.sin(theta),
-                np.full_like(theta, point[2]),
-                linewidth=1.5,
-                alpha=0.9,
-            )
-            axis.scatter(*point, s=38, marker="o")
-            axis.text(point[0], point[1], point[2] + 0.35, identifier)
-
-
-def _draw_projected_occupancy(
-    axis: Any,
-    world: Any,
-    horizontal: str,
-    vertical: str,
-    *,
-    alpha: float = 0.12,
-) -> None:
-    """Project internal occupancy into an orthogonal paper-view panel."""
-
-    occupancy = np.asarray(world.occupancy, dtype=bool).copy()
-    occupancy[0, :, :] = False
-    occupancy[-1, :, :] = False
-    occupancy[:, 0, :] = False
-    occupancy[:, -1, :] = False
-    occupancy[:, :, 0] = False
-    occupancy[:, :, -1] = False
-    indices = {"x": 0, "y": 1, "z": 2}
-    h_index = indices[horizontal]
-    v_index = indices[vertical]
-    collapsed = ({0, 1, 2} - {h_index, v_index}).pop()
-    projection = np.any(occupancy, axis=collapsed)
-    remaining = [index for index in range(3) if index != collapsed]
-    if remaining != [h_index, v_index]:
-        projection = projection.T
-    horizontal_coordinates = np.asarray(world.axes[h_index], dtype=float)
-    vertical_coordinates = np.asarray(world.axes[v_index], dtype=float)
-    axis.contourf(
-        horizontal_coordinates,
-        vertical_coordinates,
-        projection.T.astype(float),
-        levels=[0.5, 1.5],
-        alpha=alpha,
-    )
-
-
-def _plot_target_projections(
-    axis: Any,
-    controller: Any,
-    horizontal: str,
-    vertical: str,
-) -> None:
-    coordinates = {"x": 0, "y": 1, "z": 2}
-    for identifier, target in controller.targets.items():
-        point = np.asarray(target.x_star[: controller.dimension], dtype=float)
-        radius = _target_radius(target)
-        h_value = point[coordinates[horizontal]]
-        v_value = point[coordinates[vertical]]
-        if {horizontal, vertical} == {"x", "y"}:
-            patch = Circle((h_value, v_value), radius, fill=False, linewidth=1.4)
-        else:
-            patch = Ellipse((h_value, v_value), 2.0 * radius, 0.38, fill=False, linewidth=1.4)
-        axis.add_patch(patch)
-        axis.scatter(h_value, v_value, s=28, marker="o")
-        axis.annotate(identifier, (h_value, v_value), xytext=(4, 4), textcoords="offset points")
-
-
-def _plot_active_target_segments_3d(axis: Any, metrics: pd.DataFrame) -> None:
-    if metrics.empty:
-        return
-    target_ids = list(dict.fromkeys(metrics["active_target"].astype(str).tolist()))
-    cmap = plt.get_cmap("tab10")
-    for index, target_id in enumerate(target_ids):
-        selected = metrics[metrics["active_target"].astype(str) == target_id]
-        if selected.empty:
-            continue
-        axis.plot(
-            selected["x"], selected["y"], selected["z"],
-            linewidth=2.4,
-            color=cmap(index % 10),
-            label=f"safe trajectory toward {target_id}",
-        )
-
-
-
 def plot_world_trajectory_3d(
     *,
     world: Any,
@@ -293,68 +177,37 @@ def plot_world_trajectory_3d(
     controller: Any,
     directory: str | Path,
     dpi: int,
-    summary: Mapping[str, Any] | None = None,
-    nominal_path: np.ndarray | None = None,
-    direct_line: np.ndarray | None = None,
 ) -> None:
-    """Plot obstacle geometry, mission references, and the verified trajectory."""
+    """Plot the obstacle world, target centers, and filtered 3-D trajectory."""
 
     configure_academic_style()
-    terminal_label, terminal_marker, terminal_phrase = _terminal_plot_metadata(summary)
-    figure = plt.figure(figsize=(12.8, 9.2))
+    figure = plt.figure(figsize=(11.5, 8.5))
     axis = figure.add_subplot(111, projection="3d")
     draw_world_obstacles(axis, world, alpha=0.22)
-    _draw_landing_zones_3d(axis, controller)
-
-    if direct_line is not None and len(direct_line):
-        direct = np.asarray(direct_line, dtype=float)
-        axis.plot(
-            direct[:, 0], direct[:, 1], direct[:, 2],
-            linestyle="--", linewidth=1.3, alpha=0.75,
-            label="straight-line mission reference (intersects terrain)",
-        )
-    if nominal_path is not None and len(nominal_path):
-        nominal = np.asarray(nominal_path, dtype=float)
-        axis.plot(
-            nominal[:, 0], nominal[:, 1], nominal[:, 2],
-            linestyle=":", linewidth=1.8, alpha=0.95,
-            label="clearance-aware nominal path",
-        )
     if not metrics.empty:
-        _plot_active_target_segments_3d(axis, metrics)
-        axis.scatter(
-            metrics["x"].iloc[0], metrics["y"].iloc[0], metrics["z"].iloc[0],
-            s=70, label="start",
-        )
-        axis.scatter(
-            metrics["x"].iloc[-1], metrics["y"].iloc[-1], metrics["z"].iloc[-1],
-            s=105, marker=terminal_marker, label=terminal_label,
-        )
-
-    if not events.empty and not metrics.empty:
-        styles = {
-            "target_failed": ("X", "landing-zone failure"),
-            "active_target_switched": ("D", "certified target switch"),
-            "hold": ("s", "HOLD entry"),
-            "landed": ("*", "touchdown event"),
-        }
-        for event_name, (marker_style, label) in styles.items():
-            selected = events[events["event"] == event_name]
-            for occurrence, (_, event) in enumerate(selected.iterrows()):
-                index = int(np.argmin(np.abs(metrics["time_s"].to_numpy() - float(event["time_s"]))))
-                point = metrics.iloc[index][["x", "y", "z"]].to_numpy(float)
-                axis.scatter(*point, s=82, marker=marker_style, label=label if occurrence == 0 else None)
-
+        axis.plot(metrics["x"], metrics["y"], metrics["z"], label="safe trajectory")
+        axis.scatter(metrics["x"].iloc[0], metrics["y"].iloc[0], metrics["z"].iloc[0], s=70, label="start")
+        axis.scatter(metrics["x"].iloc[-1], metrics["y"].iloc[-1], metrics["z"].iloc[-1], s=70, marker="x", label="terminal state")
+    for identifier, point in _target_positions(controller).items():
+        axis.scatter(*point, s=55, marker="o")
+        axis.text(point[0], point[1], point[2] + 0.25, identifier)
+    if not events.empty:
+        switches = events[events["event"] == "active_target_switched"]
+        for _, event in switches.iterrows():
+            if metrics.empty:
+                continue
+            index = int(np.argmin(np.abs(metrics["time_s"].to_numpy() - event["time_s"])))
+            point = metrics.iloc[index][["x", "y", "z"]].to_numpy(float)
+            axis.scatter(*point, s=90, marker="D", label="target switch")
     axis.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]")
     axis.set_xlim(0.0, world.extent_m[0])
     axis.set_ylim(0.0, world.extent_m[1])
     axis.set_zlim(0.0, world.extent_m[2])
-    axis.view_init(elev=27, azim=-62)
-    scenario_name = getattr(world, "name", "predefined world").replace("_", " ")
-    axis.set_title(f"{scenario_name}: obstacle-rich approach ending in {terminal_phrase}")
+    axis.view_init(elev=27, azim=-63)
+    axis.set_title("Predefined 3-D landing scenario and filtered trajectory")
     handles, labels = axis.get_legend_handles_labels()
     unique = dict(zip(labels, handles, strict=False))
-    axis.legend(unique.values(), unique.keys(), loc="upper left", framealpha=0.92)
+    axis.legend(unique.values(), unique.keys(), loc="upper left")
     save_figure(figure, directory, "world_trajectory_3d", dpi=dpi)
 
 
@@ -365,50 +218,29 @@ def plot_trajectory_views(
     world: Any,
     directory: str | Path,
     dpi: int,
-    summary: Mapping[str, Any] | None = None,
-    nominal_path: np.ndarray | None = None,
-    direct_line: np.ndarray | None = None,
 ) -> None:
-    """Plot orthogonal views with obstacle projections and landing regions."""
+    """Plot orthogonal trajectory projections with common physical scales."""
 
     configure_academic_style()
-    terminal_label, terminal_marker, terminal_phrase = _terminal_plot_metadata(summary)
-    figure, axes = plt.subplots(1, 3, figsize=(16.8, 5.5))
-    views = [("x", "y", "XY top view"), ("x", "z", "XZ side view"), ("y", "z", "YZ side view")]
-    axis_limits = {"x": world.extent_m[0], "y": world.extent_m[1], "z": world.extent_m[2]}
-    cmap = plt.get_cmap("tab10")
-    target_ids = [] if metrics.empty else list(dict.fromkeys(metrics["active_target"].astype(str).tolist()))
-
+    figure, axes = plt.subplots(1, 3, figsize=(15.5, 4.8))
+    views = [("x", "y", "XY view"), ("x", "z", "XZ view"), ("y", "z", "YZ view")]
     for axis, (horizontal, vertical, title) in zip(axes, views, strict=True):
-        _draw_projected_occupancy(axis, world, horizontal, vertical)
-        if direct_line is not None and len(direct_line):
-            direct = np.asarray(direct_line, dtype=float)
-            lookup = {"x": direct[:, 0], "y": direct[:, 1], "z": direct[:, 2]}
-            axis.plot(lookup[horizontal], lookup[vertical], linestyle="--", linewidth=1.1, alpha=0.7, label="straight line")
-        if nominal_path is not None and len(nominal_path):
-            nominal = np.asarray(nominal_path, dtype=float)
-            lookup = {"x": nominal[:, 0], "y": nominal[:, 1], "z": nominal[:, 2]}
-            axis.plot(lookup[horizontal], lookup[vertical], linestyle=":", linewidth=1.6, label="nominal path")
         if not metrics.empty:
-            for index, target_id in enumerate(target_ids):
-                selected = metrics[metrics["active_target"].astype(str) == target_id]
-                axis.plot(selected[horizontal], selected[vertical], color=cmap(index % 10), linewidth=2.2, label=f"toward {target_id}")
-            axis.scatter(metrics[horizontal].iloc[0], metrics[vertical].iloc[0], s=48, label="start")
-            axis.scatter(metrics[horizontal].iloc[-1], metrics[vertical].iloc[-1], s=75, marker=terminal_marker, label=terminal_label)
-        _plot_target_projections(axis, controller, horizontal, vertical)
-        axis.set_xlim(0.0, axis_limits[horizontal])
-        axis.set_ylim(0.0, axis_limits[vertical])
+            axis.plot(metrics[horizontal], metrics[vertical], label="safe trajectory")
+            axis.scatter(metrics[horizontal].iloc[0], metrics[vertical].iloc[0], s=50, label="start")
+            axis.scatter(metrics[horizontal].iloc[-1], metrics[vertical].iloc[-1], s=55, marker="x", label="terminal")
+        for identifier, point in _target_positions(controller).items():
+            coordinate = {"x": point[0], "y": point[1], "z": point[2]}
+            axis.scatter(coordinate[horizontal], coordinate[vertical], s=38)
+            axis.annotate(identifier, (coordinate[horizontal], coordinate[vertical]), xytext=(4, 4), textcoords="offset points")
         axis.set_xlabel(f"{horizontal} [m]")
         axis.set_ylabel(f"{vertical} [m]")
         axis.set_title(title)
-        if {horizontal, vertical} == {"x", "y"}:
-            axis.set_aspect("equal", adjustable="box")
-
-    handles, labels = axes[0].get_legend_handles_labels()
-    unique = dict(zip(labels, handles, strict=False))
-    axes[0].legend(unique.values(), unique.keys(), loc="best", fontsize=7)
-    figure.suptitle(f"Orthogonal views of the obstacle-avoidance trajectory ending in {terminal_phrase}")
+        axis.set_aspect("equal", adjustable="box")
+    axes[0].legend(loc="best")
+    figure.suptitle("Orthogonal views of the 3-D landing trajectory")
     save_figure(figure, directory, "trajectory_orthogonal_views", dpi=dpi)
+
 
 def _axis_coordinates(size: int, spacing: float) -> np.ndarray:
     """Return physical coordinates for one uniform grid axis."""
@@ -983,7 +815,6 @@ def plot_solver_comparison(
     save_figure(figure, directory, "poisson_solver_comparison", dpi=dpi)
 
 
-
 def plot_parameter_sweep(
     records: Sequence[Mapping[str, Any]],
     *,
@@ -993,37 +824,29 @@ def plot_parameter_sweep(
     name: str,
     dpi: int,
 ) -> None:
-    """Plot paper metrics and mark terminal success for each sweep case."""
+    """Plot the common six paper metrics for a one-dimensional parameter sweep."""
 
     if not records:
         return
     configure_academic_style()
     frame = pd.DataFrame(records).sort_values(parameter)
-    figure, axes = plt.subplots(2, 3, figsize=(15.8, 8.8))
+    figure, axes = plt.subplots(2, 3, figsize=(15.5, 8.5))
     metrics = [
-        ("minimum_poisson_h", "minimum $h_P$"),
+        ("minimum_poisson_h", "minimum h_P"),
         ("minimum_hocbf_residual", "minimum HOCBF residual"),
-        ("minimum_obstacle_clearance_m", "minimum obstacle clearance [m]"),
+        ("minimum_contingency_pivot", "minimum r-th ROA pivot"),
         ("mean_intervention_norm", "mean control intervention"),
-        ("duration_s", "rollout duration [s]"),
-        ("final_target_error_m", "terminal target error [m]"),
+        ("duration_s", "landing duration [s]"),
+        ("p95_solver_time_ms", "filter p95 time [ms]"),
     ]
-    successful = frame.get("landed", pd.Series([False] * len(frame))).astype(bool).to_numpy()
     for axis, (column, label) in zip(axes.ravel(), metrics, strict=True):
-        if column not in frame:
-            axis.set_visible(False)
-            continue
-        axis.plot(frame[parameter], frame[column], linewidth=1.5, alpha=0.7)
-        axis.scatter(frame.loc[successful, parameter], frame.loc[successful, column], marker="o", label="landed")
-        axis.scatter(frame.loc[~successful, parameter], frame.loc[~successful, column], marker="x", label="not landed")
+        axis.plot(frame[parameter], frame[column], marker="o")
         axis.set(xlabel=parameter, ylabel=label, title=label)
         if np.all(frame[parameter] > 0.0):
             axis.set_xscale("log")
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    if handles:
-        figure.legend(handles, labels, loc="upper center", ncol=2)
     figure.suptitle(title)
     save_figure(figure, directory, name, dpi=dpi)
+
 
 def plot_forcing_comparison(
     *,
@@ -1312,7 +1135,6 @@ def plot_live_summary(
     save_figure(figure, directory, "live_certificate_histories", dpi=dpi)
 
 
-
 def plot_trajectory_family(
     trajectories: Mapping[float, pd.DataFrame],
     *,
@@ -1322,9 +1144,14 @@ def plot_trajectory_family(
     directory: str | Path,
     name: str,
     dpi: int,
-    summaries: Mapping[float, Mapping[str, Any]] | None = None,
 ) -> None:
-    """Plot parameterized 3-D trajectories with obstacle and outcome context."""
+    """Plot one parameterized family of 3-D trajectories and its projections.
+
+    The same scalar colormap is shared by all panels, so spatial changes can be
+    attributed directly to the swept parameter rather than to arbitrary line
+    styling. Empty or failed rollouts are skipped but remain present in the raw
+    CSV summaries.
+    """
 
     valid = {
         float(value): frame
@@ -1334,59 +1161,31 @@ def plot_trajectory_family(
     if not valid:
         return
     configure_academic_style()
-    summaries = summaries or {}
     values = np.asarray(sorted(valid), dtype=float)
-    normalization = matplotlib.colors.LogNorm(values.min(), values.max()) if np.all(values > 0.0) else matplotlib.colors.Normalize(values.min(), values.max())
-    cmap = plt.get_cmap("turbo")
-    figure = plt.figure(figsize=(16.2, 11.0))
+    normalization = matplotlib.colors.LogNorm(values.min(), values.max()) if np.all(values > 0) else matplotlib.colors.Normalize(values.min(), values.max())
+    cmap = plt.get_cmap("viridis")
+    figure = plt.figure(figsize=(15.8, 10.0))
     grid = figure.add_gridspec(2, 2)
     ax3d = figure.add_subplot(grid[0, 0], projection="3d")
     ax_xy = figure.add_subplot(grid[0, 1])
     ax_xz = figure.add_subplot(grid[1, 0])
     ax_yz = figure.add_subplot(grid[1, 1])
-    draw_world_obstacles(ax3d, world, alpha=0.10)
-    _draw_projected_occupancy(ax_xy, world, "x", "y", alpha=0.09)
-    _draw_projected_occupancy(ax_xz, world, "x", "z", alpha=0.09)
-    _draw_projected_occupancy(ax_yz, world, "y", "z", alpha=0.09)
-
-    for target in world.targets:
-        point = np.asarray(target.x_star[:3], dtype=float)
-        radius = _target_radius(target)
-        theta = np.linspace(0.0, 2.0 * np.pi, 100)
-        ax3d.plot(point[0] + radius * np.cos(theta), point[1] + radius * np.sin(theta), np.full_like(theta, point[2]), linewidth=0.9)
-        ax_xy.add_patch(Circle((point[0], point[1]), radius, fill=False, linewidth=1.0))
-        ax_xy.annotate(target.identifier, point[:2], xytext=(3, 3), textcoords="offset points")
-
-    outcome_labels: set[str] = set()
+    draw_world_obstacles(ax3d, world, alpha=0.08)
     for value in values:
         frame = valid[float(value)]
-        summary = summaries.get(float(value), {})
-        terminal_label, terminal_marker, _ = _terminal_plot_metadata(summary)
-        line_style = "-" if bool(summary.get("landed", False)) else "--"
         color = cmap(normalization(value))
         if "z" in frame:
-            ax3d.plot(frame["x"], frame["y"], frame["z"], color=color, linewidth=1.8, linestyle=line_style)
-            ax_xz.plot(frame["x"], frame["z"], color=color, linewidth=1.8, linestyle=line_style)
-            ax_yz.plot(frame["y"], frame["z"], color=color, linewidth=1.8, linestyle=line_style)
-            ax3d.scatter(frame["x"].iloc[-1], frame["y"].iloc[-1], frame["z"].iloc[-1], color=color, marker=terminal_marker, s=28)
-        label = terminal_label if terminal_label not in outcome_labels else None
-        outcome_labels.add(terminal_label)
-        ax_xy.plot(frame["x"], frame["y"], color=color, linewidth=1.8, linestyle=line_style, label=label)
-        ax_xy.scatter(frame["x"].iloc[-1], frame["y"].iloc[-1], color=color, marker=terminal_marker, s=28)
-        ax_xz.scatter(frame["x"].iloc[-1], frame["z"].iloc[-1], color=color, marker=terminal_marker, s=25)
-        ax_yz.scatter(frame["y"].iloc[-1], frame["z"].iloc[-1], color=color, marker=terminal_marker, s=25)
-
+            ax3d.plot(frame["x"], frame["y"], frame["z"], color=color, linewidth=1.8)
+            ax_xz.plot(frame["x"], frame["z"], color=color, linewidth=1.8)
+            ax_yz.plot(frame["y"], frame["z"], color=color, linewidth=1.8)
+        ax_xy.plot(frame["x"], frame["y"], color=color, linewidth=1.8)
     ax3d.set(xlabel="x [m]", ylabel="y [m]", zlabel="z [m]", title="3-D trajectory family")
-    ax3d.set_xlim(0.0, world.extent_m[0]); ax3d.set_ylim(0.0, world.extent_m[1]); ax3d.set_zlim(0.0, world.extent_m[2])
     ax3d.view_init(elev=26, azim=-62)
-    ax_xy.set(xlabel="x [m]", ylabel="y [m]", title="XY top view", xlim=(0.0, world.extent_m[0]), ylim=(0.0, world.extent_m[1]), aspect="equal")
-    ax_xz.set(xlabel="x [m]", ylabel="z [m]", title="XZ side view", xlim=(0.0, world.extent_m[0]), ylim=(0.0, world.extent_m[2]))
-    ax_yz.set(xlabel="y [m]", ylabel="z [m]", title="YZ side view", xlim=(0.0, world.extent_m[1]), ylim=(0.0, world.extent_m[2]))
-    if outcome_labels:
-        ax_xy.legend(loc="best", title="terminal outcome", fontsize=7)
+    ax_xy.set(xlabel="x [m]", ylabel="y [m]", title="XY projection", aspect="equal")
+    ax_xz.set(xlabel="x [m]", ylabel="z [m]", title="XZ projection")
+    ax_yz.set(xlabel="y [m]", ylabel="z [m]", title="YZ projection")
     scalar = matplotlib.cm.ScalarMappable(norm=normalization, cmap=cmap)
     scalar.set_array(values)
     figure.colorbar(scalar, ax=[ax3d, ax_xy, ax_xz, ax_yz], shrink=0.78, label=parameter_label)
     figure.suptitle(title)
     save_figure(figure, directory, name, dpi=dpi)
-

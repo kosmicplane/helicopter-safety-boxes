@@ -77,7 +77,18 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     for mode in ("predefined_world", "static_image", "live_vision"):
         zones = config["experiments"][mode].get("landing_zones")
         if zones is None and mode == "predefined_world":
-            zones = config["experiments"][mode]["world"]["landing_zones"]
+            world = config["experiments"][mode]["world"]
+            zones = world.get("landing_zones")
+            if zones is None and "world_file" in world:
+                count = world.get("landing_zone_count")
+                if count is None:
+                    raise ValueError(
+                        "A predefined world loaded from world_file must declare "
+                        "world.landing_zone_count for configuration validation."
+                    )
+                zones = [None] * int(count)
+        if zones is None:
+            raise ValueError(f"Landing zones are not configured for {mode}.")
         if required > len(zones):
             raise ValueError(f"r={required} exceeds the landing-zone count in {mode}.")
 

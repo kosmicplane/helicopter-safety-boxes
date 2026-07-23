@@ -1,17 +1,32 @@
-"""Deterministic 3-D Mars-analog obstacle world for the flagship experiment."""
+"""Deterministic 3-D Mars-analog worlds for controlled landing studies.
+
+The predefined-world experiment intentionally keeps geometry outside the
+controller implementation.  A YAML world definition is converted into one
+canonical occupancy grid, an analytic obstacle list for visualization, a
+metric clearance field, and target equilibria.  The same geometry therefore
+feeds the nominal planner, Poisson safety synthesis, collision checking, and
+paper figures.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from pathlib import Path
+from typing import Any, Mapping, Sequence
 
 import numpy as np
+import yaml
+from scipy.ndimage import distance_transform_edt
 
 from safety_box_core import EquilibriumTarget
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True, slots=True)
 class Obstacle:
+    """One analytic obstacle used for rasterization and visualization."""
+
     name: str
     kind: str
     parameters: Mapping[str, Any]
@@ -19,7 +34,10 @@ class Obstacle:
 
 @dataclass(frozen=True, slots=True)
 class PredefinedWorld:
+    """Canonical representation shared by all predefined-world components."""
+
     occupancy: np.ndarray
+    clearance_m: np.ndarray
     spacing: tuple[float, float, float]
     extent_m: tuple[float, float, float]
     axes: tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -27,6 +45,16 @@ class PredefinedWorld:
     targets: tuple[EquilibriumTarget, ...]
     obstacles: tuple[Obstacle, ...]
     inflation_m: float
+    name: str
+    summary: str
+    source_file: str | None
+
+
+def _float_tuple(values: Sequence[Any], length: int, name: str) -> tuple[float, ...]:
+    result = tuple(float(value) for value in values)
+    if len(result) != length:
+        raise ValueError(f"{name} must contain exactly {length} values.")
+    return result
 
 
 def _box_mask(
@@ -98,13 +126,13 @@ def _annular_mask(
     return (
         (radial >= inner**2)
         & (radial <= outer**2)
-        & (Z >= z_range[0])
+        & (Z >= max(0.0, z_range[0] - inflation))
         & (Z <= z_range[1] + inflation)
     )
 
 
-def obstacle_library() -> tuple[Obstacle, ...]:
-    """Return the fixed obstacle set used by the paper-oriented experiment."""
+def _inline_default_obstacles() -> tuple[Obstacle, ...]:
+    """Legacy fallback retained for backward compatibility."""
 
     return (
         Obstacle(
@@ -170,28 +198,123 @@ def obstacle_library() -> tuple[Obstacle, ...]:
     )
 
 
-def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
-    """Rasterize the configured world and validate start and landing zones."""
+def _load_world_definition(config: Mapping[str, Any]) -> tuple[dict[str, Any], str | None]:
+    world_config = dict(config["experiments"]["predefined_world"]["world"])
+    world_file = world_config.get("world_file")
+    if world_file is None:
+        return world_config, None
 
-    world_config = config["experiments"]["predefined_world"]["world"]
-    extent = tuple(float(value) for value in world_config["extent_m"])
+    path = Path(str(world_file))
+    if not path.is_absolute():
+        path = REPOSITORY_ROOT / path
+    if not path.is_file():
+        raise FileNotFoundError(f"Predefined-world file not found: {path}")
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(loaded, Mapping):
+        raise TypeError(f"World definition must be a mapping: {path}")
+
+    # Inline values remain useful for experiment-specific overrides.
+    merged = dict(loaded)
+    for key, value in world_config.items():
+        if key != "world_file":
+            merged[key] = value
+    return merged, str(path.relative_to(REPOSITORY_ROOT))
+
+
+def _parse_obstacle(record: Mapping[str, Any], index: int) -> Obstacle:
+    if not isinstance(record, Mapping):
+        raise TypeError(f"Obstacle entry {index} must be a mapping.")
+    name = str(record.get("name", f"obstacle_{index:02d}"))
+    kind = str(record["type"])
+    if kind == "box":
+        parameters = {
+            "minimum": _float_tuple(record["minimum"], 3, f"{name}.minimum"),
+            "maximum": _float_tuple(record["maximum"], 3, f"{name}.maximum"),
+        }
+    elif kind == "cylinder":
+        parameters = {
+            "center": _float_tuple(record["center"], 2, f"{name}.center"),
+            "radius": float(record["radius"]),
+            "z_range": _float_tuple(record["z_range"], 2, f"{name}.z_range"),
+        }
+    elif kind == "ellipsoid":
+        parameters = {
+            "center": _float_tuple(record["center"], 3, f"{name}.center"),
+            "radii": _float_tuple(record["radii"], 3, f"{name}.radii"),
+        }
+    elif kind == "annular_cylinder":
+        parameters = {
+            "center": _float_tuple(record["center"], 2, f"{name}.center"),
+            "inner_radius": float(record["inner_radius"]),
+            "outer_radius": float(record["outer_radius"]),
+            "z_range": _float_tuple(record["z_range"], 2, f"{name}.z_range"),
+        }
+    else:
+        raise ValueError(f"Unsupported obstacle type {kind!r} for {name!r}.")
+    return Obstacle(name=name, kind=kind, parameters=parameters)
+
+
+def _parse_targets(
+    records: Sequence[Any],
+    landing_radius: float,
+) -> tuple[EquilibriumTarget, ...]:
+    targets: list[EquilibriumTarget] = []
+    for index, record in enumerate(records):
+        if isinstance(record, Mapping):
+            identifier = str(record.get("id", f"LZ{index}"))
+            point = np.asarray(record["position_m"], dtype=float)
+            label = str(record.get("label", identifier))
+        else:
+            identifier = f"LZ{index}"
+            point = np.asarray(record, dtype=float)
+            label = identifier
+        if point.shape != (3,):
+            raise ValueError(f"Landing target {identifier!r} must contain [x, y, z].")
+        targets.append(
+            EquilibriumTarget(
+                identifier=identifier,
+                x_star=np.concatenate([point, np.zeros(3)]),
+                u_star=np.zeros(3),
+                metadata={
+                    "position_m": point.tolist(),
+                    "radius_m": float(landing_radius),
+                    "label": label,
+                },
+            )
+        )
+    if not targets:
+        raise ValueError("At least one landing zone is required.")
+    identifiers = [target.identifier for target in targets]
+    if len(identifiers) != len(set(identifiers)):
+        raise ValueError("Landing-zone identifiers must be unique.")
+    return tuple(targets)
+
+
+def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
+    """Rasterize the configured world and validate all mission-critical points."""
+
+    world_config, source_file = _load_world_definition(config)
+    extent = _float_tuple(world_config["extent_m"], 3, "extent_m")
     shape = tuple(int(value) for value in world_config["grid_shape"])
+    if len(shape) != 3 or min(shape) < 4:
+        raise ValueError("grid_shape must contain three values of at least four cells.")
     inflation = float(world_config.get("obstacle_inflation_m", 0.20))
     axes = tuple(np.linspace(0.0, extent[index], shape[index]) for index in range(3))
     spacing = tuple(float(axis[1] - axis[0]) for axis in axes)
     X, Y, Z = np.meshgrid(*axes, indexing="ij")
     occupancy = np.zeros(shape, dtype=bool)
-    obstacles = obstacle_library()
+
+    obstacle_records = world_config.get("obstacles")
+    obstacles = (
+        tuple(_parse_obstacle(record, index) for index, record in enumerate(obstacle_records))
+        if obstacle_records is not None
+        else _inline_default_obstacles()
+    )
     for obstacle in obstacles:
         parameters = obstacle.parameters
         if obstacle.kind == "box":
             occupancy |= _box_mask(
-                X,
-                Y,
-                Z,
-                parameters["minimum"],
-                parameters["maximum"],
-                inflation,
+                X, Y, Z, parameters["minimum"], parameters["maximum"], inflation
             )
         elif obstacle.kind == "cylinder":
             occupancy |= _cylinder_mask(
@@ -205,12 +328,7 @@ def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
             )
         elif obstacle.kind == "ellipsoid":
             occupancy |= _ellipsoid_mask(
-                X,
-                Y,
-                Z,
-                parameters["center"],
-                parameters["radii"],
-                inflation,
+                X, Y, Z, parameters["center"], parameters["radii"], inflation
             )
         elif obstacle.kind == "annular_cylinder":
             occupancy |= _annular_mask(
@@ -223,10 +341,8 @@ def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
                 parameters["z_range"],
                 inflation,
             )
-        else:
-            raise ValueError(f"Unsupported obstacle kind {obstacle.kind!r}.")
 
-    # The computational boundary is Dirichlet and is represented as occupied.
+    # The computational boundary carries the homogeneous Dirichlet condition.
     occupancy[0, :, :] = True
     occupancy[-1, :, :] = True
     occupancy[:, 0, :] = True
@@ -234,32 +350,26 @@ def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
     occupancy[:, :, 0] = True
     occupancy[:, :, -1] = True
 
+    clearance_m = distance_transform_edt(~occupancy, sampling=spacing)
     start_state = np.asarray(world_config["start_state"], dtype=float)
-    targets: list[EquilibriumTarget] = []
+    if start_state.shape != (6,):
+        raise ValueError("start_state must be [x, y, z, vx, vy, vz].")
     landing_radius = float(world_config.get("landing_radius_m", 0.60))
-    for index, position in enumerate(world_config["landing_zones"]):
-        point = np.asarray(position, dtype=float)
-        targets.append(
-            EquilibriumTarget(
-                identifier=f"LZ{index}",
-                x_star=np.concatenate([point, np.zeros(3)]),
-                u_star=np.zeros(3),
-                metadata={
-                    "position_m": point.tolist(),
-                    "radius_m": landing_radius,
-                },
-            )
-        )
+    targets = _parse_targets(world_config["landing_zones"], landing_radius)
 
     world = PredefinedWorld(
         occupancy=occupancy,
+        clearance_m=clearance_m,
         spacing=spacing,
         extent_m=extent,
         axes=axes,
         start_state=start_state,
-        targets=tuple(targets),
+        targets=targets,
         obstacles=obstacles,
         inflation_m=inflation,
+        name=str(world_config.get("name", "predefined_world")),
+        summary=str(world_config.get("summary", "")),
+        source_file=source_file,
     )
     if point_is_occupied(world, start_state[:3]):
         raise RuntimeError("The start state lies in occupied space.")
@@ -269,11 +379,40 @@ def build_world(config: Mapping[str, Any]) -> PredefinedWorld:
     return world
 
 
+def _nearest_index(world: PredefinedWorld, point: np.ndarray) -> tuple[int, int, int]:
+    coordinate = np.asarray(point, dtype=float)
+    index = np.rint(coordinate / np.asarray(world.spacing)).astype(int)
+    index = np.clip(index, 0, np.asarray(world.occupancy.shape) - 1)
+    return tuple(int(value) for value in index)
+
+
 def point_is_occupied(world: PredefinedWorld, point: np.ndarray) -> bool:
     """Query the nearest occupancy voxel, treating out-of-bounds points as occupied."""
 
     coordinate = np.asarray(point, dtype=float)
-    index = np.rint(coordinate / np.asarray(world.spacing)).astype(int)
-    if np.any(index < 0) or np.any(index >= np.asarray(world.occupancy.shape)):
+    if np.any(coordinate < 0.0) or np.any(coordinate > np.asarray(world.extent_m)):
         return True
-    return bool(world.occupancy[tuple(index)])
+    return bool(world.occupancy[_nearest_index(world, coordinate)])
+
+
+def point_clearance_m(world: PredefinedWorld, point: np.ndarray) -> float:
+    """Return nearest-voxel obstacle clearance in metres."""
+
+    coordinate = np.asarray(point, dtype=float)
+    if np.any(coordinate < 0.0) or np.any(coordinate > np.asarray(world.extent_m)):
+        return 0.0
+    return float(world.clearance_m[_nearest_index(world, coordinate)])
+
+
+def segment_collision_fraction(
+    world: PredefinedWorld,
+    start: np.ndarray,
+    goal: np.ndarray,
+    *,
+    samples: int = 500,
+) -> float:
+    """Return the fraction of a straight segment lying in occupied voxels."""
+
+    points = np.linspace(np.asarray(start, dtype=float), np.asarray(goal, dtype=float), samples)
+    occupied = np.fromiter((point_is_occupied(world, point) for point in points), dtype=bool)
+    return float(np.mean(occupied))

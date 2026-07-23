@@ -50,6 +50,24 @@ class PoissonField:
     def raw_h(self) -> np.ndarray:
         return np.asarray(self.result.h, dtype=float)
 
+    @property
+    def occupancy(self) -> np.ndarray:
+        """Boolean occupancy mask used to construct the field."""
+
+        return np.asarray(self.result.occupancy_mask, dtype=bool)
+
+    @property
+    def boundary_mask(self) -> np.ndarray:
+        """Dirichlet frontier extracted from the occupancy representation."""
+
+        return np.asarray(self.result.boundary_mask, dtype=bool)
+
+    @property
+    def forcing(self) -> np.ndarray:
+        """Configured Poisson forcing field."""
+
+        return np.asarray(self.result.forcing, dtype=float)
+
     def sample(self, point: np.ndarray, *, partial_h_t: float = 0.0) -> SafetySample | None:
         """Interpolate ``h``, ``Dh``, and ``D²h`` at one physical point."""
 

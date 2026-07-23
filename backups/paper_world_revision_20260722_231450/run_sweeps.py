@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Run controlled parameter sweeps on one fixed Mars-analog world.
-
-The sweep scenario defaults to ``baseline`` so the independent variable is not
-confounded by target failures. A different named scenario may be requested
-explicitly for a dedicated ablation.
-"""
+"""Run paper-oriented parameter sweeps for the predefined 3-D world."""
 
 from __future__ import annotations
 
@@ -20,37 +15,22 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from experiments.common.plotting import configure_exports
-from experiments.common.cli import (
-    add_common_arguments,
-    load_config_from_arguments,
-    make_output_directory,
-    save_run_metadata,
-)
+from experiments.common.cli import add_common_arguments, load_config_from_arguments, make_output_directory, save_run_metadata
 from experiments.common.controller import LandingController
 from experiments.common.poisson_field import compute_poisson_field
-from experiments.common.simulation import run_simulation
+from experiments.common.simulation import resolve_failure_schedule, run_simulation
 from experiments.common.nominal_planner import ObstacleAwareNominalPlanner
 from experiments.common.plotting import plot_parameter_sweep, plot_trajectory_family
-from experiments.predefined_world.scenarios import resolve_scenario
-from experiments.predefined_world.world import (
-    build_world,
-    point_clearance_m,
-    point_is_occupied,
-)
+from experiments.predefined_world.world import build_world, point_is_occupied
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description="Run HOCBF, CLF, and ROA parameter sweeps.")
+    result = argparse.ArgumentParser(description="Run HOCBF and CLF alpha sweeps.")
     add_common_arguments(result)
-    result.add_argument(
-        "--scenario",
-        default=None,
-        help="Optional fixed scenario for every sweep case; default is the configured sweep_scenario.",
-    )
     result.add_argument(
         "--no-failure",
         action="store_true",
-        help="Alias for --scenario baseline.",
+        help="Disable every configured landing-zone failure in all sweep cases.",
     )
     return result
 
@@ -61,11 +41,10 @@ def _run_case(
     field: object,
     output: Path,
     label: str,
-    scenario_name: str,
-    nominal_mode: str = "astar_pd",
+    *,
+    disable_failures: bool = False,
 ) -> tuple[dict, pd.DataFrame]:
     simulation = config["experiments"]["predefined_world"]["simulation"]
-    scenario = resolve_scenario(config, scenario_name)
     controller = LandingController(
         dimension=3,
         targets=world.targets,
@@ -84,16 +63,15 @@ def _run_case(
         targets={target.identifier: target.x_star[:3] for target in world.targets},
         position_gain=float(planner_config.get("position_gain", 0.65)),
         velocity_gain=float(planner_config.get("velocity_gain", 1.0)),
-        maximum_nominal_acceleration=float(
-            planner_config.get("maximum_nominal_acceleration", 1.2)
-        ),
+        maximum_nominal_acceleration=float(planner_config.get("maximum_nominal_acceleration", 1.2)),
         lookahead_distance_m=float(planner_config.get("lookahead_distance_m", 1.5)),
         clearance_weight=float(planner_config.get("clearance_weight", 2.0)),
         minimum_clearance_cells=float(planner_config.get("minimum_clearance_cells", 1.0)),
     )
-    nominal_provider = nominal_planner.control if nominal_mode == "astar_pd" else None
-    if nominal_mode not in {"astar_pd", "direct_clf"}:
-        raise ValueError(f"Unsupported sweep nominal mode {nominal_mode!r}." )
+    failure_schedule = resolve_failure_schedule(
+        simulation,
+        disabled=bool(disable_failures),
+    )
     result = run_simulation(
         controller=controller,
         field=field,
@@ -105,12 +83,10 @@ def _run_case(
         landing_position_tolerance=float(simulation["landing_position_tolerance_m"]),
         landing_speed_tolerance=float(simulation["landing_speed_tolerance_mps"]),
         collision_check=lambda point: point_is_occupied(world, point),
-        clearance_query=lambda point: point_clearance_m(world, point),
-        failure_schedule=scenario.failure_schedule,
+        target_failure_schedule=failure_schedule,
         variant=label,
-        nominal_control_provider=nominal_provider,
+        nominal_control_provider=nominal_planner.control,
     )
-    result.summary["scenario"] = scenario.name
     return result.summary, result.metrics
 
 
@@ -120,36 +96,17 @@ def run(arguments: argparse.Namespace) -> Path:
         pdf=bool(config.get("visualization", {}).get("save_pdf", True)),
         svg=bool(config.get("visualization", {}).get("save_svg", True)),
     )
-    output = make_output_directory(
-        config=config,
-        mode="predefined_world_sweeps",
-        explicit=arguments.output,
-    )
-    sweeps = config["experiments"]["predefined_world"]["sweeps"]
-    scenario_name = (
-        "baseline"
-        if arguments.no_failure
-        else str(arguments.scenario or sweeps.get("sweep_scenario", "baseline"))
-    )
-    save_run_metadata(
-        config=config,
-        output=output,
-        mode=f"predefined_world_sweeps:{scenario_name}",
-        command=sys.argv,
-    )
+    output = make_output_directory(config=config, mode="predefined_world_sweeps", explicit=arguments.output)
+    save_run_metadata(config=config, output=output, mode="predefined_world_sweeps", command=sys.argv)
     figures = output / "figures"
     data = output / "data"
     data.mkdir(parents=True, exist_ok=True)
     world = build_world(config)
-    field = compute_poisson_field(
-        world.occupancy,
-        spacing=world.spacing,
-        config=config["boxes"]["poisson"],
-    )
+    field = compute_poisson_field(world.occupancy, spacing=world.spacing, config=config["boxes"]["poisson"])
+    sweeps = config["experiments"]["predefined_world"]["sweeps"]
 
-    hocbf_records: list[dict] = []
+    hocbf_records = []
     hocbf_trajectories: dict[float, pd.DataFrame] = {}
-    hocbf_summaries: dict[float, dict] = {}
     base_gamma1 = float(config["boxes"]["cbf"]["gamma1"])
     base_gamma2 = float(config["boxes"]["cbf"]["gamma2"])
     for scale in sweeps["hocbf_alpha_scales"]:
@@ -162,35 +119,32 @@ def run(arguments: argparse.Namespace) -> Path:
             field,
             data / f"hocbf_alpha_{float(scale):.4g}",
             f"hocbf_alpha_{float(scale):.4g}",
-            scenario_name,
-            "direct_clf",
+            disable_failures=bool(arguments.no_failure),
         )
         hocbf_records.append({"alpha_scale": float(scale), **summary})
         hocbf_trajectories[float(scale)] = metrics
-        hocbf_summaries[float(scale)] = summary
     pd.DataFrame(hocbf_records).to_csv(data / "hocbf_alpha_sweep.csv", index=False)
     plot_parameter_sweep(
         hocbf_records,
         parameter="alpha_scale",
-        title="HOCBF alpha sensitivity under a deliberately unsafe direct nominal controller",
+        title="HOCBF gain sensitivity under sequential landing-zone failures",
         directory=figures,
         name="hocbf_alpha_sensitivity",
         dpi=int(config["visualization"]["dpi"]),
     )
+
     plot_trajectory_family(
         hocbf_trajectories,
         world=world,
         parameter_label="HOCBF alpha scale",
-        title="HOCBF alpha sensitivity with a fixed unsafe direct nominal command on the same obstacle world",
+        title="HOCBF gain sensitivity: trajectories under sequential failures",
         directory=figures,
         name="hocbf_alpha_trajectory_family",
         dpi=int(config["visualization"]["dpi"]),
-        summaries=hocbf_summaries,
     )
 
-    clf_records: list[dict] = []
+    clf_records = []
     clf_trajectories: dict[float, pd.DataFrame] = {}
-    clf_summaries: dict[float, dict] = {}
     for gain in sweeps["clf_alpha_gains"]:
         case = deepcopy(config)
         case["boxes"]["clf"]["alpha"] = {"type": "linear", "gain": float(gain)}
@@ -200,17 +154,15 @@ def run(arguments: argparse.Namespace) -> Path:
             field,
             data / f"clf_alpha_{float(gain):.4g}",
             f"clf_alpha_{float(gain):.4g}",
-            scenario_name,
-            "astar_pd",
+            disable_failures=bool(arguments.no_failure),
         )
         clf_records.append({"alpha_gain": float(gain), **summary})
         clf_trajectories[float(gain)] = metrics
-        clf_summaries[float(gain)] = summary
     pd.DataFrame(clf_records).to_csv(data / "clf_alpha_sweep.csv", index=False)
     plot_parameter_sweep(
         clf_records,
         parameter="alpha_gain",
-        title="CLF decrease-rate sensitivity: convergence, intervention, and terminal accuracy",
+        title="CLF decrease-rate sensitivity under sequential landing-zone failures",
         directory=figures,
         name="clf_alpha_sensitivity",
         dpi=int(config["visualization"]["dpi"]),
@@ -219,25 +171,21 @@ def run(arguments: argparse.Namespace) -> Path:
         clf_trajectories,
         world=world,
         parameter_label="CLF alpha gain",
-        title="CLF decrease-rate sensitivity on the same obstacle-rich Mars-analog world",
+        title="CLF decrease-rate sensitivity: trajectories under sequential failures",
         directory=figures,
         name="clf_alpha_trajectory_family",
         dpi=int(config["visualization"]["dpi"]),
-        summaries=clf_summaries,
     )
 
-    roa_records: list[dict] = []
+    roa_records = []
     for fraction in sweeps.get("roa_fractions", []):
         case = deepcopy(config)
         case["boxes"]["clf"]["roa_fraction"] = float(fraction)
         summary, _ = _run_case(
-            case,
-            world,
-            field,
+            case, world, field,
             data / f"roa_fraction_{float(fraction):.4g}",
             f"roa_fraction_{float(fraction):.4g}",
-            scenario_name,
-            "astar_pd",
+            disable_failures=bool(arguments.no_failure),
         )
         roa_records.append({"roa_fraction": float(fraction), **summary})
     if roa_records:
@@ -245,13 +193,12 @@ def run(arguments: argparse.Namespace) -> Path:
         plot_parameter_sweep(
             roa_records,
             parameter="roa_fraction",
-            title="Region-of-attraction scaling: contingency margin and landing performance",
+            title="ROA scaling under sequential landing-zone failures",
             directory=figures,
             name="roa_fraction_sensitivity",
             dpi=int(config["visualization"]["dpi"]),
         )
 
-    print(f"SWEEP_SCENARIO={scenario_name}")
     print(f"OUTPUT_DIRECTORY={output}")
     return output
 

@@ -78,56 +78,65 @@ visualization:
   live_history_length: 240
 planner:
   type: astar_pd
-  position_gain: 0.72
-  velocity_gain: 1.08
-  maximum_nominal_acceleration: 1.55
-  lookahead_distance_m: 2.2
-  clearance_weight: 2.8
+  position_gain: 0.65
+  velocity_gain: 1.0
+  maximum_nominal_acceleration: 1.2
+  lookahead_distance_m: 1.5
+  clearance_weight: 2.0
   minimum_clearance_cells: 1.0
 experiments:
   predefined_world:
     world:
-      world_file: configs/worlds/mars_analog_landing.yaml
-      landing_zone_count: 4
+      extent_m:
+      - 18.0
+      - 14.0
+      - 10.0
+      grid_shape:
+      - 32
+      - 25
+      - 18
+      obstacle_inflation_m: 0.2
+      start_state:
+      - 1.0
+      - 1.1
+      - 8.6
+      - 0.0
+      - 0.0
+      - 0.0
+      landing_radius_m: 0.6
+      landing_zones:
+      - - 16.7
+        - 12.2
+        - 0.85
+      - - 16.2
+        - 2.4
+        - 0.85
+      - - 13.6
+        - 12.5
+        - 0.85
+      - - 8.8
+        - 1.8
+        - 0.85
     simulation:
       dt_s: 0.06
-      maximum_steps: 1200
-      maximum_acceleration_mps2: 5.5
-      maximum_speed_component_mps: 3.0
-      initial_target: LZ0
-      landing_position_tolerance_m: 0.55
-      landing_speed_tolerance_mps: 0.35
+      maximum_steps: 620
+      maximum_acceleration_mps2: 4.0
+      maximum_speed_component_mps: 2.4
+      initial_target: LZ2
+      landing_position_tolerance_m: 0.42
+      landing_speed_tolerance_mps: 0.32
       nominal_position_gain: 0.8
       nominal_velocity_gain: 1.2
-      default_scenario: single_failure
-      scenarios:
-        baseline:
-          description: Obstacle-rich primary landing without target failures.
-          failure_schedule: []
-        single_failure:
-          description: The active primary site becomes unavailable during final approach;
-            the vehicle diverts and lands at a certified alternative.
-          failure_schedule:
-          - target: active
-            earliest_time_s: 8.0
-            trigger_distance_m: 8.5
-            reason: Primary landing site rejected during approach
-        sequential_failure:
-          description: Successive active-site losses demonstrate repeated certified
-            diversion and eventual HOLD when r-out-of-p contingency is exhausted.
-          failure_schedule:
-          - target: active
-            earliest_time_s: 7.0
-            trigger_distance_m: 9.0
-            reason: Primary landing site rejected during approach
-          - target: active
-            minimum_delay_s: 5.0
-            trigger_distance_m: 7.0
-            reason: First contingency site rejected during approach
-          - target: active
-            minimum_delay_s: 5.0
-            trigger_distance_m: 6.0
-            reason: Second contingency site rejected during approach
+      failure_schedule:
+      - time_s: 8.0
+        target: active
+        reason: Primary landing zone became unavailable
+      - time_s: 14.0
+        target: active
+        reason: First contingency landing zone became unavailable
+      - time_s: 20.0
+        target: active
+        reason: Second contingency landing zone became unavailable
     sweeps:
       hocbf_alpha_scales:
       - 0.45
@@ -160,7 +169,6 @@ experiments:
       - conjugate_gradient
       - sor
       solver_forcing: constant
-      sweep_scenario: baseline
   static_image:
     workspace_size_m:
     - 6.0
@@ -189,8 +197,8 @@ experiments:
     simulation:
       dt_s: 0.045
       maximum_steps: 520
-      maximum_acceleration_mps2: 2.8
-      maximum_speed_component_mps: 1.7
+      maximum_acceleration_mps2: 1
+      maximum_speed_component_mps: 2
       initial_target: LZ0
       failure_time_s: 7.0
       failed_target: LZ0
@@ -220,8 +228,10 @@ experiments:
     - 107
     robot_radius_m: 0.12
     perception_margin_m: 0.06
-    source: experiments/live_vision/assets/example_stream.avi
+    source: http://10.8.5.210:8080/stream.mjpg
     background_file: experiments/live_vision/assets/example_background.png
+    capture_background_interactively: true
+    minimum_start_occupied_fraction: 0.0005
     maximum_frames: 180
     poisson_update_interval_frames: 10
     occupancy_change_trigger: 0.005
@@ -245,10 +255,18 @@ experiments:
       maximum_acceleration_mps2: 2.8
       maximum_speed_component_mps: 1.7
       initial_target: LZ0
-      failure_frame: 90
-      failed_target: LZ0
       nominal_position_gain: 0.9
       nominal_velocity_gain: 1.3
+      failure_schedule:
+      - frame: 120
+        target: active
+        reason: Primary landing zone became unavailable
+      - frame: 260
+        target: active
+        reason: First contingency landing zone became unavailable
+      - frame: 400
+        target: active
+        reason: Second contingency landing zone became unavailable
     segmentation:
       mode: background_reference
       reference_file: experiments/live_vision/assets/example_background.png
@@ -272,11 +290,11 @@ profiles:
       predefined_world:
         world:
           grid_shape:
-          - 36
-          - 27
-          - 17
+          - 24
+          - 19
+          - 14
         simulation:
-          maximum_steps: 900
+          maximum_steps: 520
         sweeps:
           hocbf_alpha_scales:
           - 0.65
