@@ -24,13 +24,13 @@ This repository studies the coupled problem
 
 $$
 \text{environment geometry}
-\;\longrightarrow\;
+\longrightarrow\
 \text{smooth environmental safety}
-\;\longrightarrow\;
+\longrightarrow\
 \text{landing stabilization}
-\;\longrightarrow\;
+\longrightarrow\
 \text{multi-zone contingency}
-\;\longrightarrow\;
+\longrightarrow\
 \text{verified safe command}.
 $$
 
@@ -92,7 +92,7 @@ with
 $$
 x=
 \begin{bmatrix}
-p\\v
+p\\ v
 \end{bmatrix}
 \in\mathbb R^6,
 \qquad
@@ -208,7 +208,7 @@ Each landing site $j$ defines a controlled equilibrium
 $$
 x_j^\star=
 \begin{bmatrix}
-p_j^\star\\0
+p_j^\star\\ 0
 \end{bmatrix}.
 $$
 
